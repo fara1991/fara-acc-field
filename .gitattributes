@@ -1,0 +1,6 @@
+﻿# Set the default behavior to force CRLF on checkout and in the repository
+* text eol=crlf
+
+# Denote all files that are truly binary and should not be modified.
+*.png binary
+*.jpg binary
