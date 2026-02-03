@@ -152,18 +152,31 @@ namespace FaraAccSupporter.Views
 
         public void Dispose()
         {
-            if (_menuButton != null)
+            try
             {
+                if (_menuButton != null)
+                {
 #if BS_1_29_1
-                MenuButtons.instance.UnregisterButton(_menuButton);
+                    if (MenuButtons.instance != null)
+                    {
+                        MenuButtons.instance.UnregisterButton(_menuButton);
+                    }
 #else
-                MenuButtons.Instance.UnregisterButton(_menuButton);
+                    if (MenuButtons.Instance != null)
+                    {
+                        MenuButtons.Instance.UnregisterButton(_menuButton);
+                    }
 #endif
-            }
+                }
 
-            if (_modalView != null)
+                if (_modalView != null && _modalView.gameObject != null)
+                {
+                    UnityEngine.Object.Destroy(_modalView.gameObject);
+                }
+            }
+            catch (Exception ex)
             {
-                UnityEngine.Object.Destroy(_modalView.gameObject);
+                Plugin.Log?.Warn($"Error during SettingsMenuManager disposal: {ex.Message}");
             }
         }
     }
