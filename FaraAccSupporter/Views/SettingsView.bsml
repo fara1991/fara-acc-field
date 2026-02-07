@@ -41,5 +41,37 @@
   <toggle-setting text="Show Trajectory Line"
                   value="show-trajectory"
                   apply-on-change="true"
-                  hover-hint="Show a line from each saber to its nearest matching note (TD/TI aware)"/>
+                  hover-hint="Show a line from each saber to its nearest matching note"/>
+
+  <toggle-setting text="TD/TI Aware Trajectory"
+                  value="trajectory-td-enabled"
+                  apply-on-change="true"
+                  hover-hint="When enabled, trajectory considers Time Dependency (outer notes show optimal cut position). When disabled, always points to note center."/>
+
+  <horizontal>
+    <text text="Note Grid Guide" font-size="4"/>
+  </horizontal>
+
+  <toggle-setting text="Show Note Grid"
+                  value="show-note-grid"
+                  apply-on-change="true"
+                  hover-hint="Show semi-transparent cubes at each of the 12 note positions at cut depth"/>
+
+  <slider-setting text="Note Grid Opacity"
+                  value="note-grid-alpha"
+                  min="0.1"
+                  max="1.0"
+                  increment="0.05"
+                  apply-on-change="true"
+                  hover-hint="Opacity of the note grid guide cubes"/>
+
+  <toggle-setting text="Link RhythmMarker Z Offset"
+                  value="link-rhythm-marker-z"
+                  apply-on-change="true"
+                  hover-hint="When enabled and FaraRhythmMarker is installed, uses its Z offset for grid depth. Otherwise uses Z=0.5"/>
+
+  <toggle-setting text="Debug Position Log"
+                  value="note-grid-debug-log"
+                  apply-on-change="true"
+                  hover-hint="Log grid cube and note X/Y/Z coordinates to file for debugging"/>
 </settings-container>

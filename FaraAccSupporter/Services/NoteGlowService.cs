@@ -191,11 +191,41 @@ namespace FaraAccSupporter.Services
         /// </summary>
         public void Clear()
         {
-            // Try to restore original colors before clearing
-            foreach (var kvp in _activeGlows)
+            if (_activeGlows.Count == 0)
+                return;
+
+            // Create a copy of keys to avoid modification during enumeration
+            var notes = new List<NoteController>(_activeGlows.Keys);
+
+            foreach (var note in notes)
             {
-                RemoveGlow(kvp.Key);
+                try
+                {
+                    if (_activeGlows.TryGetValue(note, out var glowData))
+                    {
+                        // Restore original colors
+                        for (int i = 0; i < glowData.Renderers.Length; i++)
+                        {
+                            var renderer = glowData.Renderers[i];
+                            if (renderer?.material == null)
+                                continue;
+
+                            var material = renderer.material;
+
+                            if (material.HasProperty("_Color") && i < glowData.OriginalColors.Length)
+                                material.SetColor("_Color", glowData.OriginalColors[i]);
+
+                            if (material.HasProperty("_EmissionColor") && i < glowData.OriginalEmissions.Length)
+                                material.SetColor("_EmissionColor", glowData.OriginalEmissions[i]);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log?.Debug($"Error restoring note color during clear: {ex.Message}");
+                }
             }
+
             _activeGlows.Clear();
         }
 

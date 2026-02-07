@@ -75,6 +75,10 @@
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.XRModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
@@ -105,6 +109,12 @@
     <!-- BSML for UI -->
     <Reference Include="BSML">
       <HintPath>$(BeatSaberDir)\Plugins\BSML.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- FaraRhythmMarker (optional dependency) -->
+    <Reference Include="FaraRhythmMarker">
+      <HintPath>$(BeatSaberDir)\Plugins\FaraRhythmMarker.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

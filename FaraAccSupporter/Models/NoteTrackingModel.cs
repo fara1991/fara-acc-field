@@ -276,6 +276,17 @@ namespace FaraAccSupporter.Models
         }
 
         /// <summary>
+        /// Gets a snapshot of all active notes for iteration.
+        /// </summary>
+        public List<NoteController> GetActiveNotes()
+        {
+            lock (_lock)
+            {
+                return new List<NoteController>(_activeNotes);
+            }
+        }
+
+        /// <summary>
         /// Gets the count of currently tracked notes.
         /// </summary>
         public int ActiveNoteCount

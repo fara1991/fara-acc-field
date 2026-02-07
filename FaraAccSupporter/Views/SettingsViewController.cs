@@ -19,8 +19,13 @@ namespace FaraAccSupporter.Views
         private bool _enabled;
         private bool _vibrationEnabled;
         private bool _showTrajectory;
+        private bool _trajectoryTDEnabled;
         private bool _preSwingGlow;
         private float _followThroughStrength;
+        private bool _showNoteGrid;
+        private float _noteGridAlpha;
+        private bool _linkRhythmMarkerZ;
+        private bool _noteGridDebugLog;
 
         #region UI Values
 
@@ -60,6 +65,18 @@ namespace FaraAccSupporter.Views
             }
         }
 
+        [UIValue("trajectory-td-enabled")]
+        public bool TrajectoryTDEnabled
+        {
+            get => _trajectoryTDEnabled;
+            set
+            {
+                _trajectoryTDEnabled = value;
+                PluginConfig.Instance.TrajectoryTDEnabled = value;
+                PluginConfig.Instance.Changed();
+            }
+        }
+
         [UIValue("pre-swing-glow")]
         public bool PreSwingGlow
         {
@@ -84,6 +101,54 @@ namespace FaraAccSupporter.Views
             }
         }
 
+        [UIValue("show-note-grid")]
+        public bool ShowNoteGrid
+        {
+            get => _showNoteGrid;
+            set
+            {
+                _showNoteGrid = value;
+                PluginConfig.Instance.ShowNoteGrid = value;
+                PluginConfig.Instance.Changed();
+            }
+        }
+
+        [UIValue("note-grid-alpha")]
+        public float NoteGridAlpha
+        {
+            get => _noteGridAlpha;
+            set
+            {
+                _noteGridAlpha = value;
+                PluginConfig.Instance.NoteGridAlpha = value;
+                PluginConfig.Instance.Changed();
+            }
+        }
+
+        [UIValue("link-rhythm-marker-z")]
+        public bool LinkRhythmMarkerZ
+        {
+            get => _linkRhythmMarkerZ;
+            set
+            {
+                _linkRhythmMarkerZ = value;
+                PluginConfig.Instance.LinkRhythmMarkerZOffset = value;
+                PluginConfig.Instance.Changed();
+            }
+        }
+
+        [UIValue("note-grid-debug-log")]
+        public bool NoteGridDebugLog
+        {
+            get => _noteGridDebugLog;
+            set
+            {
+                _noteGridDebugLog = value;
+                PluginConfig.Instance.NoteGridDebugLog = value;
+                PluginConfig.Instance.Changed();
+            }
+        }
+
         #endregion
 
         public void Initialize()
@@ -97,8 +162,13 @@ namespace FaraAccSupporter.Views
             _enabled = PluginConfig.Instance.Enabled;
             _vibrationEnabled = PluginConfig.Instance.VibrationEnabled;
             _showTrajectory = PluginConfig.Instance.ShowTrajectoryLine;
+            _trajectoryTDEnabled = PluginConfig.Instance.TrajectoryTDEnabled;
             _preSwingGlow = PluginConfig.Instance.PreSwingGlowEnabled;
             _followThroughStrength = PluginConfig.Instance.FollowThroughVibrationStrength;
+            _showNoteGrid = PluginConfig.Instance.ShowNoteGrid;
+            _noteGridAlpha = PluginConfig.Instance.NoteGridAlpha;
+            _linkRhythmMarkerZ = PluginConfig.Instance.LinkRhythmMarkerZOffset;
+            _noteGridDebugLog = PluginConfig.Instance.NoteGridDebugLog;
         }
 
         private void RegisterSettingsMenu()
@@ -228,6 +298,17 @@ namespace FaraAccSupporter.Views
             }
         }
 
+        [UIValue("trajectory-td-enabled")]
+        public bool TrajectoryTDEnabled
+        {
+            get => _manager?.TrajectoryTDEnabled ?? true;
+            set
+            {
+                if (_manager != null)
+                    _manager.TrajectoryTDEnabled = value;
+            }
+        }
+
         [UIValue("pre-swing-glow")]
         public bool PreSwingGlow
         {
@@ -247,6 +328,50 @@ namespace FaraAccSupporter.Views
             {
                 if (_manager != null)
                     _manager.FollowThroughStrength = value;
+            }
+        }
+
+        [UIValue("show-note-grid")]
+        public bool ShowNoteGrid
+        {
+            get => _manager?.ShowNoteGrid ?? false;
+            set
+            {
+                if (_manager != null)
+                    _manager.ShowNoteGrid = value;
+            }
+        }
+
+        [UIValue("note-grid-alpha")]
+        public float NoteGridAlpha
+        {
+            get => _manager?.NoteGridAlpha ?? 0.25f;
+            set
+            {
+                if (_manager != null)
+                    _manager.NoteGridAlpha = value;
+            }
+        }
+
+        [UIValue("link-rhythm-marker-z")]
+        public bool LinkRhythmMarkerZ
+        {
+            get => _manager?.LinkRhythmMarkerZ ?? true;
+            set
+            {
+                if (_manager != null)
+                    _manager.LinkRhythmMarkerZ = value;
+            }
+        }
+
+        [UIValue("note-grid-debug-log")]
+        public bool NoteGridDebugLog
+        {
+            get => _manager?.NoteGridDebugLog ?? false;
+            set
+            {
+                if (_manager != null)
+                    _manager.NoteGridDebugLog = value;
             }
         }
     }
