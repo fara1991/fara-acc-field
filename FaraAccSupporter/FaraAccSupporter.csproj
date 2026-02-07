@@ -13,7 +13,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <BeatSaberDir>C:\Users\Fara\BSManager\BSInstances\1.29.1</BeatSaberDir>
+    <BeatSaberDir>$(USERPROFILE)\BSManager\BSInstances\1.29.1</BeatSaberDir>
     <LocalRefsDir>$(ProjectDir)Libs</LocalRefsDir>
   </PropertyGroup>
 
