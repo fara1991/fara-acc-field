@@ -1,0 +1,43 @@
+name: 改善提案
+description: 既存機能の改善や最適化の提案をお聞かせください
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: current-feature
+    attributes:
+      label: 改善したい機能
+      description: 現在の機能のどの部分を改善したいかを説明してください
+      placeholder: 例：フォロースルー検出の振動フィードバック
+    validations:
+      required: true
+  - type: textarea
+    id: improvement-proposal
+    attributes:
+      label: 改善提案の内容
+      description: 具体的にどのような改善を提案しますか？
+      placeholder: 例：フォロースルーの振動パターンを達成度に応じて段階的に変化させる
+    validations:
+      required: true
+  - type: textarea
+    id: current-problem
+    attributes:
+      label: 現在の問題点
+      description: 現在の実装で何が問題だと感じていますか？
+      placeholder: 例：振動が一律で、どの程度フォロースルーが足りないか分かりにくい
+    validations:
+      required: true
+  - type: textarea
+    id: implementation-ideas
+    attributes:
+      label: 実装のアイデア
+      description: 実装方法について何かアイデアがあれば共有してください
+      placeholder: 例：SwingAngleCalculatorの角度に応じて振動強度を0.3〜1.0の範囲で変化させる
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 追加情報
+      description: その他、参考になる情報があれば記載してください
+    validations:
+      required: false

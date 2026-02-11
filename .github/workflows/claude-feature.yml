@@ -1,0 +1,133 @@
+name: Claude Feature Generator (Enhanced)
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  generate-feature:
+    if: |
+      contains(github.event.issue.labels.*.name, 'feature') ||
+      contains(github.event.issue.labels.*.name, 'bug') ||
+      contains(github.event.issue.labels.*.name, 'enhancement') ||
+      contains(github.event.issue.labels.*.name, 'refactor')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Gather repository context
+        run: |
+          echo "=== Repository Structure ===" > repo_context.txt
+          tree -L 3 -I 'bin|obj|node_modules|.git' >> repo_context.txt 2>/dev/null || find . -maxdepth 3 -type f -not -path '*/\.*' -not -path '*/bin/*' | head -100 >> repo_context.txt
+          echo -e "\n=== Project Files ===" >> repo_context.txt
+          find . -name "*.csproj" -o -name "package.json" -o -name "*.sln" | head -10 | while read f; do echo "File: $f" >> repo_context.txt; cat "$f" >> repo_context.txt 2>/dev/null; done
+          echo -e "\n=== Source Files ===" >> repo_context.txt
+          find . \( -name "*.cs" -o -name "*.razor" -o -name "*.js" -o -name "*.py" -o -name "*.java" \) | grep -v "/bin/" | grep -v "/obj/" | grep -v "/node_modules/" | head -30 | while read f; do echo -e "\n### File: $f" >> repo_context.txt; cat "$f" >> repo_context.txt; echo -e "\n---\n" >> repo_context.txt; done
+
+      - name: Generate feature code with Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git checkout -b feature/issue-${ISSUE_NUMBER}
+
+          REPO_CONTEXT=$(cat repo_context.txt | head -c 100000)
+          ESCAPED_TITLE=$(echo "$ISSUE_TITLE" | jq -Rs .)
+          ESCAPED_BODY=$(echo "$ISSUE_BODY" | jq -Rs .)
+          ESCAPED_CONTEXT=$(echo "$REPO_CONTEXT" | jq -Rs .)
+
+          PAYLOAD=$(jq -n --argjson title "$ESCAPED_TITLE" --argjson body "$ESCAPED_BODY" --argjson context "$ESCAPED_CONTEXT" '{model: "claude-sonnet-4-20250514", max_tokens: 16000, messages: [{role: "user", content: "あなたはソフトウェア開発アシスタントです。既存コードを理解した上で、Issue の要望を実装してください。\n\n# 現在のリポジトリ：\n\n\($context)\n\n# Issue：\n\nタイトル: \($title)\n\n詳細:\n\($body)\n\n# 指示：\n\n1. 既存ファイル編集時は完全な内容を出力\n2. 新規ファイルは完全なコードを提供\n3. 削除ファイルは明示\n4. .github/workflows/ 配下は作成・変更しない\n5. 各ファイルの変更理由を説明\n\n# 出力形式：\n\n## ファイル: [パス]\n変更タイプ: [CREATE/UPDATE/DELETE]\n説明: [目的]\n\n```[言語]\n[内容]\n```"}]}')
+
+          response=$(curl -s -X POST "https://api.anthropic.com/v1/messages" -H "Content-Type: application/json" -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" -d "$PAYLOAD")
+          echo "$response" | jq '.' > claude_response.json
+          CLAUDE_TEXT=$(echo "$response" | jq -r '.content[0].text // empty')
+
+          if [ -z "$CLAUDE_TEXT" ]; then
+            echo "Error: No response from Claude API"
+            cat claude_response.json
+            exit 1
+          fi
+
+          echo "$CLAUDE_TEXT" > claude_output.txt
+
+          echo "Parsing Claude response..."
+          grep -n "^## ファイル:" claude_output.txt | while IFS=: read -r line_num filepath_line; do
+            filepath=$(echo "$filepath_line" | sed 's/^## ファイル: *//' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+
+            if [[ "$filepath" == .github/workflows/* ]]; then
+              echo "Skipping: $filepath (workflow restriction)"
+              echo "- \`$filepath\`: Skipped (workflow files)" >> skipped_files.txt
+              continue
+            fi
+
+            change_type=$(sed -n "$((line_num+1))p" claude_output.txt | grep "変更タイプ:" | sed 's/変更タイプ: *//' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' | tr '[:lower:]' '[:upper:]')
+            description=$(sed -n "$((line_num+2))p" claude_output.txt | grep "説明:" | sed 's/説明: *//')
+            [ -z "$change_type" ] && change_type="UPDATE"
+            [ -z "$description" ] && description="No description"
+
+            code_start=$(tail -n +$((line_num+1)) claude_output.txt | grep -n '```' | head -1 | cut -d: -f1)
+            if [ -n "$code_start" ]; then
+              code_start=$((line_num + code_start))
+              code_end=$(tail -n +$((code_start+1)) claude_output.txt | grep -n '```' | head -1 | cut -d: -f1)
+
+              if [ -n "$code_end" ]; then
+                code_end=$((code_start + code_end))
+                echo "Processing: $change_type - $filepath"
+
+                if [ "$change_type" = "DELETE" ]; then
+                  [ -f "$filepath" ] && rm -f "$filepath" && echo "- \`$filepath\`: $description" >> deleted_files.txt
+                else
+                  sed -n "$((code_start+1)),$((code_end-1))p" claude_output.txt > "$filepath.tmp"
+                  mkdir -p "$(dirname "$filepath")"
+                  mv "$filepath.tmp" "$filepath"
+                  [ -f "$filepath" ] && echo "- \`$filepath\`: $description" >> $( [ "$change_type" = "CREATE" ] && echo "created_files.txt" || echo "updated_files.txt" )
+                fi
+              fi
+            fi
+          done
+
+          echo "# Implementation Summary" > IMPLEMENTATION_SUMMARY.md
+          for file in created_files.txt updated_files.txt deleted_files.txt skipped_files.txt; do
+            [ -f "$file" ] && cat "$file" >> IMPLEMENTATION_SUMMARY.md && echo "" >> IMPLEMENTATION_SUMMARY.md && rm "$file"
+          done
+
+          git add .
+          [ -z "$(git diff --staged)" ] && echo "No changes" && exit 1
+          git commit -m "feat: implement $ISSUE_TITLE (issue #${ISSUE_NUMBER})"
+          git push origin feature/issue-${ISSUE_NUMBER}
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          IS_FEATURE: ${{ contains(github.event.issue.labels.*.name, 'feature') }}
+          IS_BUG: ${{ contains(github.event.issue.labels.*.name, 'bug') }}
+          IS_REFACTOR: ${{ contains(github.event.issue.labels.*.name, 'refactor') }}
+        run: |
+          if [[ "$IS_FEATURE" == "true" ]]; then
+            BRANCH="feature/issue-${ISSUE_NUMBER}"; PREFIX="feat"
+          elif [[ "$IS_BUG" == "true" ]]; then
+            BRANCH="fix/issue-${ISSUE_NUMBER}"; PREFIX="fix"
+          elif [[ "$IS_REFACTOR" == "true" ]]; then
+            BRANCH="feature/issue-${ISSUE_NUMBER}"; PREFIX="refactor"
+          else
+            BRANCH="enhance/issue-${ISSUE_NUMBER}"; PREFIX="enhance"
+          fi
+          PR_PAYLOAD=$(jq -n --arg title "${PREFIX}: ${ISSUE_TITLE} (fixes #${ISSUE_NUMBER})" --arg issue_num "${ISSUE_NUMBER}" --arg head "${BRANCH}" --arg base "master" '{title: $title, body: ("## 概要\n\nIssue #" + $issue_num + " の実装\n\n## 自動生成\n\nClaude AI 生成\n\n## 変更内容\n\nIMPLEMENTATION_SUMMARY.md 参照\n\nCloses #" + $issue_num), head: $head, base: $base}')
+          curl -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/${{ github.repository }}/pulls" -d "$PR_PAYLOAD"

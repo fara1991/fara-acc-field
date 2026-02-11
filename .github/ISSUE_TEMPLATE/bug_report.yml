@@ -1,0 +1,61 @@
+name: バグ報告
+description: バグや問題を報告してください
+labels: ["bug"]
+body:
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: バグの説明
+      description: 発生している問題について詳しく説明してください
+      placeholder: 例：ゲームプレイ中にNote Grid Guideの表示位置がずれる
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: 再現手順
+      description: 問題を再現するための手順を詳しく記載してください
+      placeholder: |
+        例：
+        1. Beat Saberを起動
+        2. 任意の譜面をプレイ開始
+        3. Note Grid Guideを有効にした状態でプレイ
+        4. ノーツが飛んでくると...
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: 実際の動作
+      description: 実際に何が起こっているかを説明してください
+      placeholder: 例：Note Grid Guideがノーツの位置からずれて表示される
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境情報
+      description: 使用している環境について教えてください
+      placeholder: |
+        例：
+        - OS: Windows 11 Pro
+        - Beat Saber: 1.29.1
+        - Modバージョン: v1.0.0
+        - 依存Mod: BSIPA 4.3.0, SiraUtil 3.0.0, BSML 1.6.0
+        - VRヘッドセット: Meta Quest 3 (Link)
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: スクリーンショット
+      description: 問題を示すスクリーンショットがあれば添付してください
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 追加情報
+      description: その他、問題の解決に役立つ情報があれば記載してください
+    validations:
+      required: false

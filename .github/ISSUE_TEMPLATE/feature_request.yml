@@ -1,0 +1,35 @@
+name: 新機能のリクエスト
+description: 新しい機能や改善の提案をお聞かせください
+labels: ["feature"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 機能の説明
+      description: 追加したい機能について詳しく説明してください
+      placeholder: 例：カット精度のスコア履歴をリプレイで確認できる機能を追加したい
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: 期待する動作
+      description: この機能がどのように動作してほしいかを説明してください
+      placeholder: 例：プレイ終了後にノーツごとのプレスイング・フォロースルー角度の一覧が表示され、改善すべきパターンを確認できる
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 使用場面
+      description: この機能をどのような場面で使用しますか？
+      placeholder: 例：練習後の振り返り、苦手なパターンの分析
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 追加情報
+      description: その他、参考になる情報があれば記載してください（スクリーンショット、参考URL等）
+    validations:
+      required: false
