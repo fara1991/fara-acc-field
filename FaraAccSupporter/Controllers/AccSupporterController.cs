@@ -17,6 +17,7 @@ namespace FaraAccSupporter.Controllers
     {
         private readonly BeatmapObjectManager _beatmapObjectManager;
         private readonly SaberManager _saberManager;
+        private readonly ColorManager? _colorManager;
         private readonly HapticFeedbackService _hapticService;
         private readonly TrajectoryLineService _trajectoryService;
         private readonly NoteGlowService _noteGlowService;
@@ -41,16 +42,24 @@ namespace FaraAccSupporter.Controllers
         // Track which notes are currently highlighting grid cubes
         private readonly Dictionary<NoteController, (int lineIndex, int lineLayer)> _gridHighlightedNotes = new();
 
+        // Reusable buffers to avoid per-frame List allocations.
+        // Safe: all usage is sequential within single-threaded Tick().
+        private readonly List<Vector3> _trajectoryTargetBuffer = new(4);
+        private readonly List<NoteController> _completedCutsBuffer = new();
+        private readonly List<NoteController> _notesToUnhighlightBuffer = new();
+
         // First-tick SpawnController setup
         private bool _gridYInitialized;
 
         public AccSupporterController(
             BeatmapObjectManager beatmapObjectManager,
             SaberManager saberManager,
-            [InjectOptional] HapticFeedbackController? hapticController)
+            [InjectOptional] HapticFeedbackController? hapticController,
+            [InjectOptional] ColorManager? colorManager)
         {
             _beatmapObjectManager = beatmapObjectManager;
             _saberManager = saberManager;
+            _colorManager = colorManager;
 
             _hapticService = new HapticFeedbackService(hapticController);
             _trajectoryService = new TrajectoryLineService();
@@ -75,9 +84,19 @@ namespace FaraAccSupporter.Controllers
             // Subscribe to Harmony patch event for follow-through
             NoteCutPatch.OnNoteCutEvent += HandleNoteCutForFollowThrough;
 
-            // Initialize services (grid starts with default Y, corrected on first tick)
-            _trajectoryService.Initialize();
-            _noteGridService.Initialize();
+            // Get note colors from the game's color scheme
+            Color? leftColor = null;
+            Color? rightColor = null;
+            if (_colorManager != null)
+            {
+                leftColor = _colorManager.ColorForSaberType(SaberType.SaberA);
+                rightColor = _colorManager.ColorForSaberType(SaberType.SaberB);
+                Plugin.Log?.Info($"Note colors from ColorManager: Left=({leftColor.Value.r:F2},{leftColor.Value.g:F2},{leftColor.Value.b:F2}), Right=({rightColor.Value.r:F2},{rightColor.Value.g:F2},{rightColor.Value.b:F2})");
+            }
+
+            // Initialize services with colors (grid starts with default Y, corrected on first tick)
+            _trajectoryService.Initialize(leftColor, rightColor);
+            _noteGridService.Initialize(leftColor, rightColor);
 
             Plugin.Log?.Info("AccSupporterController initialized");
         }
@@ -129,7 +148,8 @@ namespace FaraAccSupporter.Controllers
 
         public void Tick()
         {
-            if (!PluginConfig.Instance.Enabled)
+            var config = PluginConfig.Instance;
+            if (!config.Enabled)
                 return;
 
             // On first tick, find SpawnController and correct grid Y positions
@@ -143,8 +163,8 @@ namespace FaraAccSupporter.Controllers
             UpdateSaberStates();
 
             // Process pre-swing for both sabers
-            ProcessPreSwing(SaberType.SaberA, _leftSaberState);
-            ProcessPreSwing(SaberType.SaberB, _rightSaberState);
+            ProcessPreSwing(SaberType.SaberA, _leftSaberState, config);
+            ProcessPreSwing(SaberType.SaberB, _rightSaberState, config);
 
             // Process follow-through for active cuts
             ProcessFollowThrough();
@@ -159,7 +179,7 @@ namespace FaraAccSupporter.Controllers
             _noteGridService.Update();
 
             // Update note grid highlighting based on note proximity
-            UpdateNoteGridHighlights();
+            UpdateNoteGridHighlights(config);
         }
 
         private void UpdateSaberStates()
@@ -183,7 +203,7 @@ namespace FaraAccSupporter.Controllers
             }
         }
 
-        private void ProcessPreSwing(SaberType saberType, SaberState saberState)
+        private void ProcessPreSwing(SaberType saberType, SaberState saberState, PluginConfig config)
         {
             // Find the nearest note for this saber
             var nearestNote = _noteTrackingModel.GetNearestNote(saberType, saberState.CurrentPosition);
@@ -205,8 +225,7 @@ namespace FaraAccSupporter.Controllers
             // Check if threshold is met
             if (SwingAngleCalculator.MeetsPreSwingThreshold(angle))
             {
-                // Apply glow effect to the note (instead of haptic)
-                if (PluginConfig.Instance.PreSwingGlowEnabled)
+                if (config.PreSwingGlowEnabled)
                 {
                     _noteGlowService.ApplyGlow(nearestNote);
                 }
@@ -216,7 +235,7 @@ namespace FaraAccSupporter.Controllers
 
         private void ProcessFollowThrough()
         {
-            var completedCuts = new List<NoteController>();
+            _completedCutsBuffer.Clear();
             float currentTime = Time.time;
 
             foreach (var kvp in _activeCuts)
@@ -226,7 +245,7 @@ namespace FaraAccSupporter.Controllers
                 // Check for timeout
                 if (currentTime - tracking.StartTime > FollowThroughTimeout)
                 {
-                    completedCuts.Add(kvp.Key);
+                    _completedCutsBuffer.Add(kvp.Key);
                     continue;
                 }
 
@@ -253,7 +272,7 @@ namespace FaraAccSupporter.Controllers
             }
 
             // Clean up completed cuts
-            foreach (var note in completedCuts)
+            foreach (var note in _completedCutsBuffer)
             {
                 _activeCuts.Remove(note);
             }
@@ -270,7 +289,6 @@ namespace FaraAccSupporter.Controllers
 
         private void UpdateSaberTrajectory(SaberType saberType, Vector3 saberPosition)
         {
-            // Get multiple nearest notes for this saber
             var notes = _noteTrackingModel.GetNearestNotes(saberType, saberPosition);
 
             if (notes.Count == 0)
@@ -279,54 +297,31 @@ namespace FaraAccSupporter.Controllers
                 return;
             }
 
-            // Build trajectory targets for each note
-            var targets = new List<TrajectoryLineService.TrajectoryTarget>();
-            bool tdEnabled = PluginConfig.Instance.TrajectoryTDEnabled;
-
+            _trajectoryTargetBuffer.Clear();
             foreach (var note in notes)
             {
-                Vector3 targetPos;
-                bool isTI;
-
-                if (tdEnabled)
-                {
-                    // TD/TI aware: use optimal position based on note type
-                    (targetPos, isTI) = _noteTrackingModel.GetOptimalTargetPosition(note, saberPosition);
-                }
-                else
-                {
-                    // TD disabled: always target note center, no TI coloring
-                    targetPos = note.noteTransform?.position ?? Vector3.zero;
-                    isTI = false;
-                }
-
-                targets.Add(new TrajectoryLineService.TrajectoryTarget
-                {
-                    Position = targetPos,
-                    IsTimeIndependent = isTI
-                });
+                _trajectoryTargetBuffer.Add(note.noteTransform?.position ?? Vector3.zero);
             }
 
-            // Update all trajectory lines for this saber
-            _trajectoryService.UpdateTrajectories(saberType, saberPosition, targets);
+            _trajectoryService.UpdateTrajectories(saberType, saberPosition, _trajectoryTargetBuffer);
         }
 
-        private void UpdateNoteGridHighlights()
+        private void UpdateNoteGridHighlights(PluginConfig config)
         {
-            if (!PluginConfig.Instance.ShowNoteGrid)
+            if (!config.ShowNoteGrid)
                 return;
 
             float gridZ = _noteGridService.CurrentZOffset;
             var activeNotes = _noteTrackingModel.GetActiveNotes();
 
             // Calibrate Y from notes passing near grid Z, and unhighlight those that passed
-            var notesToUnhighlight = new List<NoteController>();
+            _notesToUnhighlightBuffer.Clear();
             foreach (var kvp in _gridHighlightedNotes)
             {
                 var note = kvp.Key;
                 if (note == null || note.noteTransform == null)
                 {
-                    notesToUnhighlight.Add(note!);
+                    _notesToUnhighlightBuffer.Add(note!);
                     continue;
                 }
 
@@ -341,10 +336,10 @@ namespace FaraAccSupporter.Controllers
                 }
 
                 if (noteZ < gridZ - 0.1f)
-                    notesToUnhighlight.Add(note);
+                    _notesToUnhighlightBuffer.Add(note);
             }
 
-            foreach (var note in notesToUnhighlight)
+            foreach (var note in _notesToUnhighlightBuffer)
             {
                 if (_gridHighlightedNotes.TryGetValue(note, out var pos))
                 {
@@ -369,7 +364,7 @@ namespace FaraAccSupporter.Controllers
                     int lineLayer = (int)note.noteData.noteLineLayer;
                     bool isLeft = note.noteData.colorType == ColorType.ColorA;
 
-                    if (PluginConfig.Instance.NoteGridDebugLog)
+                    if (config.NoteGridDebugLog)
                     {
                         var notePosition = note.noteTransform.position;
                         var side = isLeft ? "L" : "R";
@@ -407,7 +402,8 @@ namespace FaraAccSupporter.Controllers
                 float jumpOffsetY = spawnCtrl.jumpOffsetY;
                 float gridZ = _noteGridService.CurrentZOffset;
 
-                if (PluginConfig.Instance.NoteGridDebugLog)
+                bool debugLog = PluginConfig.Instance.NoteGridDebugLog;
+                if (debugLog)
                     Plugin.Log?.Info($"SpawnController found: centerPos=({center.x:F3}, {center.y:F3}, {center.z:F3}), jumpOffsetY={jumpOffsetY:F3}, gridZ={gridZ:F3}");
 
                 for (int layer = 0; layer < 3; layer++)
@@ -415,7 +411,7 @@ namespace FaraAccSupporter.Controllers
                     float yAtDistance = spawnData.JumpPosYForLineLayerAtDistanceFromPlayerWithoutJumpOffset(
                         (NoteLineLayer)layer, gridZ);
                     float finalY = yAtDistance + jumpOffsetY;
-                    if (PluginConfig.Instance.NoteGridDebugLog)
+                    if (debugLog)
                         Plugin.Log?.Info($"  Layer {layer}: yAtDistance={yAtDistance:F3}, +jumpOffset={jumpOffsetY:F3} => Y={finalY:F3}");
                     _noteGridService.CalibrateYFromNote(layer, finalY);
                 }

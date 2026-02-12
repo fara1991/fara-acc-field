@@ -7,12 +7,18 @@ namespace FaraAccSupporter.Services
 {
     /// <summary>
     /// Manages trajectory line rendering from sabers to their nearest notes.
-    /// Supports multiple simultaneous notes per saber.
+    /// Each target note gets a sphere indicator at its center with X/Y/Z axis lines.
     /// </summary>
     internal class TrajectoryLineService : IDisposable
     {
-        // Maximum lines per saber (for simultaneous notes)
         private const int MaxLinesPerSaber = 4;
+
+        // Beat Saber center scoring: score = 15 * (1 - distance/0.3)
+        private const float kMaxCenterDistance = 0.3f;
+
+        // X/Y/Z axis lines through sphere center
+        private const float AxisLineExtension = 0.05f;
+        private const float AxisLineWidth = 0.005f;
 
         private readonly List<LineData> _leftLines = new();
         private readonly List<LineData> _rightLines = new();
@@ -20,18 +26,15 @@ namespace FaraAccSupporter.Services
 
         private bool _isInitialized = false;
 
-        // Line colors for Time Dependent notes (semi-transparent)
-        private static readonly Color LeftLineColorTD = new Color(1f, 0.3f, 0.3f, 0.6f);   // Red for left saber
-        private static readonly Color RightLineColorTD = new Color(0.3f, 0.3f, 1f, 0.6f);  // Blue for right saber
-
-        // Line colors for Time Independent notes (brighter/green tint to indicate TI)
-        private static readonly Color LeftLineColorTI = new Color(1f, 0.8f, 0.3f, 0.7f);   // Orange/gold for left TI
-        private static readonly Color RightLineColorTI = new Color(0.3f, 1f, 0.8f, 0.7f);  // Cyan for right TI
+        // Line colors (set from ColorManager at runtime)
+        private Color _leftLineColor = new Color(1f, 0.3f, 0.3f, 0.6f);
+        private Color _rightLineColor = new Color(0.3f, 0.3f, 1f, 0.6f);
 
         /// <summary>
-        /// Initializes the trajectory line renderers.
+        /// Initializes the trajectory line renderers, spheres, and axis lines.
+        /// Colors must be provided here; they are used to create line/sphere materials.
         /// </summary>
-        public void Initialize()
+        public void Initialize(Color? leftColor = null, Color? rightColor = null)
         {
             if (_isInitialized)
                 return;
@@ -39,9 +42,13 @@ namespace FaraAccSupporter.Services
             if (!PluginConfig.Instance.ShowTrajectoryLine)
                 return;
 
+            if (leftColor.HasValue)
+                _leftLineColor = new Color(leftColor.Value.r, leftColor.Value.g, leftColor.Value.b, 0.6f);
+            if (rightColor.HasValue)
+                _rightLineColor = new Color(rightColor.Value.r, rightColor.Value.g, rightColor.Value.b, 0.6f);
+
             try
             {
-                // Create material for the lines
                 var shader = Shader.Find("Sprites/Default");
                 if (shader == null)
                     shader = Shader.Find("UI/Default");
@@ -55,11 +62,10 @@ namespace FaraAccSupporter.Services
                 _lineMaterial.SetInt("_ZWrite", 0);
                 _lineMaterial.renderQueue = 3000;
 
-                // Create multiple lines for each saber
                 for (int i = 0; i < MaxLinesPerSaber; i++)
                 {
-                    _leftLines.Add(CreateLineData($"AccSupporter_LeftTrajectory_{i}", LeftLineColorTD));
-                    _rightLines.Add(CreateLineData($"AccSupporter_RightTrajectory_{i}", RightLineColorTD));
+                    _leftLines.Add(CreateLineData($"AccSupporter_LeftTrajectory_{i}", _leftLineColor));
+                    _rightLines.Add(CreateLineData($"AccSupporter_RightTrajectory_{i}", _rightLineColor));
                 }
 
                 _isInitialized = true;
@@ -76,7 +82,19 @@ namespace FaraAccSupporter.Services
             var obj = new GameObject(name);
             var line = obj.AddComponent<LineRenderer>();
             SetupLineRenderer(line, color);
-            return new LineData { GameObject = obj, LineRenderer = line };
+
+            var (sphere, sphereRenderer) = CreateTargetSphere($"{name}_Sphere", color);
+
+            return new LineData
+            {
+                GameObject = obj,
+                LineRenderer = line,
+                Sphere = sphere,
+                SphereRenderer = sphereRenderer,
+                AxisX = CreateAxisLine($"{name}_AxisX", color, sphere),
+                AxisY = CreateAxisLine($"{name}_AxisY", color, sphere),
+                AxisZ = CreateAxisLine($"{name}_AxisZ", color, sphere)
+            };
         }
 
         private void SetupLineRenderer(LineRenderer line, Color color)
@@ -89,48 +107,101 @@ namespace FaraAccSupporter.Services
             line.endWidth = 0.01f;
             line.positionCount = 2;
             line.startColor = color;
-            line.endColor = new Color(color.r, color.g, color.b, 0.2f); // Fade at the end
+            line.endColor = new Color(color.r, color.g, color.b, 0.2f);
             line.useWorldSpace = true;
             line.enabled = false;
 
-            // Make the line not cast shadows
             line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             line.receiveShadows = false;
         }
 
-        /// <summary>
-        /// Data class for storing line renderer and its game object
-        /// </summary>
+        private (GameObject sphere, MeshRenderer? renderer) CreateTargetSphere(string name, Color color)
+        {
+            var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sphere.name = name;
+            sphere.transform.localScale = Vector3.one * 0.02f;
+
+            var collider = sphere.GetComponent<Collider>();
+            if (collider != null)
+                UnityEngine.Object.DestroyImmediate(collider);
+
+            sphere.layer = 2; // Ignore Raycast
+
+            var renderer = sphere.GetComponent<MeshRenderer>();
+            if (renderer != null && _lineMaterial != null)
+            {
+                var material = new Material(_lineMaterial);
+                material.color = new Color(color.r, color.g, color.b, 0.8f);
+                renderer.material = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+                renderer.enabled = false;
+            }
+
+            return (sphere, renderer);
+        }
+
+        private LineRenderer? CreateAxisLine(string name, Color color, GameObject parent)
+        {
+            var obj = new GameObject(name);
+            obj.transform.SetParent(parent.transform, false);
+            obj.layer = 2;
+
+            var line = obj.AddComponent<LineRenderer>();
+            if (line == null || _lineMaterial == null)
+                return null;
+
+            line.material = _lineMaterial;
+            line.startWidth = AxisLineWidth;
+            line.endWidth = AxisLineWidth;
+            line.positionCount = 2;
+            float alpha = PluginConfig.Instance.NoteGridAlpha;
+            var axisColor = new Color(color.r, color.g, color.b, alpha);
+            line.startColor = axisColor;
+            line.endColor = axisColor;
+            line.useWorldSpace = true;
+            line.enabled = false;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            line.receiveShadows = false;
+
+            return line;
+        }
+
         private class LineData
         {
             public GameObject GameObject = null!;
             public LineRenderer LineRenderer = null!;
+            public GameObject Sphere = null!;
+            public MeshRenderer? SphereRenderer;
+            public LineRenderer? AxisX;
+            public LineRenderer? AxisY;
+            public LineRenderer? AxisZ;
         }
 
         /// <summary>
-        /// Target info for a trajectory line
+        /// Updates trajectory lines, spheres, and axis lines for a specific saber.
         /// </summary>
-        public struct TrajectoryTarget
+        public void UpdateTrajectories(SaberType saberType, Vector3 saberTipPosition, List<Vector3> targets)
         {
-            public Vector3 Position;
-            public bool IsTimeIndependent;
-        }
-
-        /// <summary>
-        /// Updates trajectory lines for a specific saber with multiple targets.
-        /// </summary>
-        /// <param name="saberType">Which saber's trajectories to update</param>
-        /// <param name="saberTipPosition">Current saber tip position</param>
-        /// <param name="targets">List of target positions with TI info</param>
-        public void UpdateTrajectories(SaberType saberType, Vector3 saberTipPosition, List<TrajectoryTarget> targets)
-        {
-            if (!_isInitialized || !PluginConfig.Instance.ShowTrajectoryLine)
+            var config = PluginConfig.Instance;
+            if (!_isInitialized || !config.ShowTrajectoryLine)
             {
                 HideAllLines(saberType);
                 return;
             }
 
             var lines = saberType == SaberType.SaberA ? _leftLines : _rightLines;
+            Color baseColor = saberType == SaberType.SaberA ? _leftLineColor : _rightLineColor;
+            float axisAlpha = config.NoteGridAlpha;
+            var axisColor = new Color(baseColor.r, baseColor.g, baseColor.b, axisAlpha);
+
+            // Beat Saber awards N center points when cut distance <= 0.3*(15-N)/15.
+            // We use (15.5-N) instead of (15-N) so the sphere has a visible minimum
+            // radius even at target=15 (perfect center).
+            int centerTarget = Mathf.Clamp(config.CenterAccuracyTarget, 1, 15);
+            float sphereRadius = kMaxCenterDistance * (15.5f - centerTarget) / 15f;
+            float sphereScale = sphereRadius * 2f;
+            float axisHalfLen = sphereRadius + AxisLineExtension;
 
             for (int i = 0; i < lines.Count; i++)
             {
@@ -140,94 +211,89 @@ namespace FaraAccSupporter.Services
 
                 if (i < targets.Count)
                 {
-                    var target = targets[i];
+                    var targetPos = targets[i];
 
-                    // Check distance - only show line if note is reasonably close
-                    float distance = Vector3.Distance(saberTipPosition, target.Position);
+                    float distance = Vector3.Distance(saberTipPosition, targetPos);
                     if (distance > 5f)
                     {
-                        lineData.LineRenderer.enabled = false;
+                        SetLineDataEnabled(lineData, false);
                         continue;
                     }
 
-                    // Update line color based on TD/TI
-                    Color startColor;
-                    if (target.IsTimeIndependent)
-                    {
-                        startColor = saberType == SaberType.SaberA ? LeftLineColorTI : RightLineColorTI;
-                        lineData.LineRenderer.startWidth = 0.02f;
-                        lineData.LineRenderer.endWidth = 0.015f;
-                    }
-                    else
-                    {
-                        startColor = saberType == SaberType.SaberA ? LeftLineColorTD : RightLineColorTD;
-                        lineData.LineRenderer.startWidth = 0.015f;
-                        lineData.LineRenderer.endWidth = 0.01f;
-                    }
-
-                    // Make secondary lines slightly more transparent
+                    Color lineColor = baseColor;
                     if (i > 0)
-                    {
-                        startColor.a *= 0.7f;
-                    }
+                        lineColor.a *= 0.7f;
 
-                    Color endColor = new Color(startColor.r, startColor.g, startColor.b, 0.15f);
+                    Color endColor = new Color(lineColor.r, lineColor.g, lineColor.b, 0.15f);
 
-                    lineData.LineRenderer.startColor = startColor;
+                    lineData.LineRenderer.startColor = lineColor;
                     lineData.LineRenderer.endColor = endColor;
-
                     lineData.LineRenderer.enabled = true;
                     lineData.LineRenderer.SetPosition(0, saberTipPosition);
-                    lineData.LineRenderer.SetPosition(1, target.Position);
+                    lineData.LineRenderer.SetPosition(1, targetPos);
+
+                    // Position and scale sphere at note center
+                    if (lineData.Sphere != null)
+                    {
+                        lineData.Sphere.transform.position = targetPos;
+                        lineData.Sphere.transform.localScale = Vector3.one * sphereScale;
+                        if (lineData.SphereRenderer != null)
+                            lineData.SphereRenderer.enabled = true;
+                    }
+
+                    // Update X/Y/Z axis lines through sphere center
+                    UpdateAxisLine(lineData.AxisX, targetPos, Vector3.right, axisColor, axisHalfLen);
+                    UpdateAxisLine(lineData.AxisY, targetPos, Vector3.up, axisColor, axisHalfLen);
+                    UpdateAxisLine(lineData.AxisZ, targetPos, Vector3.forward, axisColor, axisHalfLen);
                 }
                 else
                 {
-                    // No target for this line, hide it
-                    lineData.LineRenderer.enabled = false;
+                    SetLineDataEnabled(lineData, false);
                 }
             }
         }
 
-        /// <summary>
-        /// Updates the trajectory line for a specific saber (single target, backwards compatible).
-        /// </summary>
-        public void UpdateTrajectory(SaberType saberType, Vector3 saberTipPosition, Vector3? targetPosition, bool isTimeIndependent = false)
+        private static void UpdateAxisLine(LineRenderer? axis, Vector3 center, Vector3 direction, Color color, float halfLength)
         {
-            var targets = new List<TrajectoryTarget>();
-            if (targetPosition.HasValue)
-            {
-                targets.Add(new TrajectoryTarget
-                {
-                    Position = targetPosition.Value,
-                    IsTimeIndependent = isTimeIndependent
-                });
-            }
-            UpdateTrajectories(saberType, saberTipPosition, targets);
+            if (axis == null)
+                return;
+
+            axis.enabled = true;
+            axis.startColor = color;
+            axis.endColor = color;
+            axis.SetPosition(0, center - direction * halfLength);
+            axis.SetPosition(1, center + direction * halfLength);
+        }
+
+        private static void SetLineDataEnabled(LineData lineData, bool enabled)
+        {
+            if (lineData.LineRenderer != null)
+                lineData.LineRenderer.enabled = enabled;
+            if (lineData.SphereRenderer != null)
+                lineData.SphereRenderer.enabled = enabled;
+            if (lineData.AxisX != null)
+                lineData.AxisX.enabled = enabled;
+            if (lineData.AxisY != null)
+                lineData.AxisY.enabled = enabled;
+            if (lineData.AxisZ != null)
+                lineData.AxisZ.enabled = enabled;
         }
 
         /// <summary>
-        /// Hides all trajectory lines for a specific saber.
+        /// Hides all trajectory lines, spheres, and axis lines for a specific saber.
         /// </summary>
         public void HideAllLines(SaberType saberType)
         {
             var lines = saberType == SaberType.SaberA ? _leftLines : _rightLines;
             foreach (var lineData in lines)
             {
-                if (lineData?.LineRenderer != null)
-                    lineData.LineRenderer.enabled = false;
+                if (lineData != null)
+                    SetLineDataEnabled(lineData, false);
             }
         }
 
         /// <summary>
-        /// Hides the trajectory line for a specific saber (backwards compatible).
-        /// </summary>
-        public void HideLine(SaberType saberType)
-        {
-            HideAllLines(saberType);
-        }
-
-        /// <summary>
-        /// Hides all trajectory lines.
+        /// Hides all trajectory lines, spheres, and axis lines.
         /// </summary>
         public void HideAllLines()
         {
@@ -246,22 +312,28 @@ namespace FaraAccSupporter.Services
                 _lineMaterial = null;
             }
 
-            foreach (var lineData in _leftLines)
-            {
-                if (lineData?.GameObject != null)
-                    UnityEngine.Object.Destroy(lineData.GameObject);
-            }
-            _leftLines.Clear();
-
-            foreach (var lineData in _rightLines)
-            {
-                if (lineData?.GameObject != null)
-                    UnityEngine.Object.Destroy(lineData.GameObject);
-            }
-            _rightLines.Clear();
+            DisposeLines(_leftLines);
+            DisposeLines(_rightLines);
 
             _isInitialized = false;
             Plugin.Log?.Info("TrajectoryLineService disposed");
+        }
+
+        private static void DisposeLines(List<LineData> lines)
+        {
+            foreach (var lineData in lines)
+            {
+                // Axis line GOs are children of Sphere, destroyed together
+                if (lineData?.Sphere != null)
+                {
+                    if (lineData.SphereRenderer?.material != null)
+                        UnityEngine.Object.Destroy(lineData.SphereRenderer.material);
+                    UnityEngine.Object.Destroy(lineData.Sphere);
+                }
+                if (lineData?.GameObject != null)
+                    UnityEngine.Object.Destroy(lineData.GameObject);
+            }
+            lines.Clear();
         }
     }
 }

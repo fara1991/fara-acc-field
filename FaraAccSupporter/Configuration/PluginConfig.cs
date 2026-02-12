@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 using IPA.Config.Stores;
 
@@ -25,11 +26,10 @@ namespace FaraAccSupporter.Configuration
         public virtual bool ShowTrajectoryLine { get; set; } = true;
 
         /// <summary>
-        /// Whether trajectory lines consider Time Dependency (TD/TI).
-        /// When enabled, outer notes show optimal cut position based on TI rules.
-        /// When disabled, always show trajectory to note center.
+        /// Center accuracy target for trajectory sphere size (1-15).
+        /// The sphere shows the scoring zone where this many center points are awarded.
         /// </summary>
-        public virtual bool TrajectoryTDEnabled { get; set; } = true;
+        public virtual int CenterAccuracyTarget { get; set; } = 15;
 
         /// <summary>
         /// Whether to glow notes when pre-swing threshold is reached
@@ -47,9 +47,9 @@ namespace FaraAccSupporter.Configuration
         public virtual bool ShowNoteGrid { get; set; } = true;
 
         /// <summary>
-        /// Note grid cube opacity (0.1 - 1.0)
+        /// Note grid cube opacity (0.01 - 0.3)
         /// </summary>
-        public virtual float NoteGridAlpha { get; set; } = 0.25f;
+        public virtual float NoteGridAlpha { get; set; } = 0.15f;
 
         /// <summary>
         /// Whether to link the note grid Z position to FaraRhythmMarker's MarkerZOffset.
@@ -75,6 +75,9 @@ namespace FaraAccSupporter.Configuration
         /// </summary>
         public virtual void OnReload()
         {
+            CenterAccuracyTarget = Math.Max(1, Math.Min(15, CenterAccuracyTarget));
+            NoteGridAlpha = Math.Max(0.01f, Math.Min(0.3f, NoteGridAlpha));
+            FollowThroughVibrationStrength = Math.Max(0.1f, Math.Min(1.0f, FollowThroughVibrationStrength));
             Plugin.Log?.Info($"Config reloaded: Enabled={Enabled}, VibrationEnabled={VibrationEnabled}");
         }
     }

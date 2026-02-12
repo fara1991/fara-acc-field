@@ -24,15 +24,23 @@ namespace FaraAccSupporter.Services
         // Note proximity threshold for color highlighting
         private const float NoteHighlightZThreshold = 1.5f;
 
-        // Default color (white/gray)
-        private static readonly Color DefaultCubeColor = new Color(0.8f, 0.8f, 0.8f);
-        // Note colors
-        private static readonly Color LeftNoteColor = new Color(0.8f, 0.2f, 0.2f);   // Red
-        private static readonly Color RightNoteColor = new Color(0.2f, 0.4f, 0.9f);  // Blue
+        // Highlight glow/pulse settings
+        private const float HighlightEmissionIntensity = 1.5f;
+        private const float HighlightPulseSpeed = 4f;
+        private const float HighlightScaleMin = 1.0f;
+        private const float HighlightScaleMax = 1.05f;
+
+        // Default color (purple)
+        private static readonly Color DefaultCubeColor = new Color(192f / 255f, 64f / 255f, 192f / 255f);
+
+        // Note colors (set from ColorManager at runtime)
+        private Color _leftNoteColor = new Color(0.8f, 0.2f, 0.2f);
+        private Color _rightNoteColor = new Color(0.2f, 0.4f, 0.9f);
 
         private GameObject? _container;
         private GameObject[]? _cubes;
-        private Material[]? _cubeMaterials; // Individual materials per cube for coloring
+        private MeshRenderer[]? _cubeRenderers;
+        private Material[]? _cubeMaterials;
         private string _shaderName = "Standard";
         private bool _isInitialized;
 
@@ -44,15 +52,26 @@ namespace FaraAccSupporter.Services
         private readonly bool[] _rowCalibrated = new bool[Rows];
 
         // Track which cubes are currently highlighted by notes
-        private readonly HashSet<int> _highlightedCubes = new();
+        private readonly bool[] _cubeHighlighted = new bool[TotalCubes];
 
-        public void Initialize()
+        // Store the base highlight color per cube (before pulse brightness is applied)
+        private readonly Color[] _highlightBaseColors = new Color[TotalCubes];
+
+        /// <summary>
+        /// Initializes the grid cubes. Colors must be provided here; they are used for highlight rendering.
+        /// </summary>
+        public void Initialize(Color? leftColor = null, Color? rightColor = null)
         {
             if (_isInitialized)
                 return;
 
             if (!PluginConfig.Instance.ShowNoteGrid)
                 return;
+
+            if (leftColor.HasValue)
+                _leftNoteColor = leftColor.Value;
+            if (rightColor.HasValue)
+                _rightNoteColor = rightColor.Value;
 
             try
             {
@@ -63,13 +82,14 @@ namespace FaraAccSupporter.Services
                 float zOffset = GetCurrentZOffset();
                 _lastZOffset = zOffset;
 
+                // Prefer unlit shaders so cubes are not affected by in-game lighting
                 string[] shaderNames =
                 {
-                    "Standard",
-                    "Legacy Shaders/Transparent/Diffuse",
-                    "Unlit/Color",
                     "Sprites/Default",
-                    "UI/Default"
+                    "UI/Default",
+                    "Unlit/Color",
+                    "Legacy Shaders/Transparent/Diffuse",
+                    "Standard"
                 };
 
                 Shader? shader = null;
@@ -97,6 +117,7 @@ namespace FaraAccSupporter.Services
                 _container.layer = 2; // Ignore Raycast
 
                 _cubes = new GameObject[TotalCubes];
+                _cubeRenderers = new MeshRenderer[TotalCubes];
                 _cubeMaterials = new Material[TotalCubes];
                 int index = 0;
                 for (int row = 0; row < Rows; row++)
@@ -111,6 +132,7 @@ namespace FaraAccSupporter.Services
                             _rowPositions[row],
                             _lastZOffset,
                             material);
+                        _cubeRenderers[index] = _cubes[index].GetComponent<MeshRenderer>();
                         index++;
                     }
                 }
@@ -144,6 +166,7 @@ namespace FaraAccSupporter.Services
 
             if (_shaderName == "Standard")
             {
+                // Fallback: configure Standard shader for transparency
                 material.SetFloat("_Mode", 3f);
                 material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
                 material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
@@ -151,14 +174,11 @@ namespace FaraAccSupporter.Services
                 material.DisableKeyword("_ALPHATEST_ON");
                 material.EnableKeyword("_ALPHABLEND_ON");
                 material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                material.renderQueue = 3000;
-            }
-            else
-            {
-                material.SetInt("_ZWrite", 0);
-                material.renderQueue = 3000;
             }
 
+            // Ensure transparent rendering for all shaders
+            material.SetInt("_ZWrite", 0);
+            material.renderQueue = 3000;
             material.color = new Color(color.r, color.g, color.b, alpha);
             return material;
         }
@@ -226,6 +246,7 @@ namespace FaraAccSupporter.Services
             }
         }
 
+
         /// <summary>
         /// Highlights a grid cube with the note's saber color.
         /// </summary>
@@ -235,17 +256,22 @@ namespace FaraAccSupporter.Services
                 return;
 
             int index = lineLayer * Columns + lineIndex;
-            if (_highlightedCubes.Contains(index))
+            if (_cubeHighlighted[index])
                 return;
 
-            _highlightedCubes.Add(index);
-            var color = isLeftNote ? LeftNoteColor : RightNoteColor;
+            _cubeHighlighted[index] = true;
+            var color = isLeftNote ? _leftNoteColor : _rightNoteColor;
+            _highlightBaseColors[index] = color;
             float alpha = PluginConfig.Instance.NoteGridAlpha;
-            _cubeMaterials[index].color = new Color(color.r, color.g, color.b, Mathf.Min(alpha + 0.2f, 1f));
+            _cubeMaterials[index].color = new Color(
+                Mathf.Clamp01(color.r * HighlightEmissionIntensity),
+                Mathf.Clamp01(color.g * HighlightEmissionIntensity),
+                Mathf.Clamp01(color.b * HighlightEmissionIntensity),
+                alpha);
         }
 
         /// <summary>
-        /// Resets a grid cube back to default color.
+        /// Resets a grid cube back to default color and disables glow.
         /// </summary>
         public void ResetCube(int lineIndex, int lineLayer)
         {
@@ -253,9 +279,13 @@ namespace FaraAccSupporter.Services
                 return;
 
             int index = lineLayer * Columns + lineIndex;
-            _highlightedCubes.Remove(index);
+            _cubeHighlighted[index] = false;
             float alpha = PluginConfig.Instance.NoteGridAlpha;
             _cubeMaterials[index].color = new Color(DefaultCubeColor.r, DefaultCubeColor.g, DefaultCubeColor.b, alpha);
+
+            // Reset scale
+            if (_cubes != null && _cubes[index] != null)
+                _cubes[index].transform.localScale = Vector3.one * CubeScale;
         }
 
         private void CheckRhythmMarkerAvailability()
@@ -313,7 +343,8 @@ namespace FaraAccSupporter.Services
 
         public void Update()
         {
-            bool shouldShow = PluginConfig.Instance.ShowNoteGrid;
+            var config = PluginConfig.Instance;
+            bool shouldShow = config.ShowNoteGrid;
 
             if (shouldShow && !_isInitialized)
             {
@@ -337,21 +368,50 @@ namespace FaraAccSupporter.Services
             }
 
             // Check if alpha changed
-            float currentAlpha = PluginConfig.Instance.NoteGridAlpha;
+            float currentAlpha = config.NoteGridAlpha;
             if (Math.Abs(currentAlpha - _lastAlpha) > 0.001f)
             {
                 _lastAlpha = currentAlpha;
                 UpdateAlpha(currentAlpha);
             }
 
-            // Update visibility
-            foreach (var cube in _cubes)
+            // Check if any cube is highlighted to avoid unnecessary pulse computation
+            bool anyHighlighted = false;
+            for (int i = 0; i < TotalCubes; i++)
             {
-                if (cube != null)
+                if (_cubeHighlighted[i]) { anyHighlighted = true; break; }
+            }
+
+            float pulseScale = CubeScale;
+            float pulseBrightness = 1.0f;
+            if (anyHighlighted)
+            {
+                float pulseT = (Mathf.Sin(Time.time * HighlightPulseSpeed) + 1f) * 0.5f;
+                pulseScale = Mathf.Lerp(HighlightScaleMin, HighlightScaleMax, pulseT) * CubeScale;
+                pulseBrightness = Mathf.Lerp(1.0f, HighlightEmissionIntensity, pulseT);
+            }
+
+            for (int i = 0; i < _cubes.Length; i++)
+            {
+                if (_cubes[i] == null)
+                    continue;
+
+                if (_cubeRenderers != null && _cubeRenderers[i] != null)
+                    _cubeRenderers[i].enabled = shouldShow;
+
+                if (_cubeHighlighted[i])
                 {
-                    var renderer = cube.GetComponent<MeshRenderer>();
-                    if (renderer != null)
-                        renderer.enabled = shouldShow;
+                    _cubes[i].transform.localScale = Vector3.one * pulseScale;
+
+                    if (_cubeMaterials != null && _cubeMaterials[i] != null)
+                    {
+                        var baseColor = _highlightBaseColors[i];
+                        _cubeMaterials[i].color = new Color(
+                            Mathf.Clamp01(baseColor.r * pulseBrightness),
+                            Mathf.Clamp01(baseColor.g * pulseBrightness),
+                            Mathf.Clamp01(baseColor.b * pulseBrightness),
+                            _cubeMaterials[i].color.a);
+                    }
                 }
             }
         }
@@ -401,24 +461,13 @@ namespace FaraAccSupporter.Services
                     continue;
 
                 var color = _cubeMaterials[i].color;
-                // Highlighted cubes get slightly higher alpha
-                float cubeAlpha = _highlightedCubes.Contains(i) ? Mathf.Min(alpha + 0.2f, 1f) : alpha;
-                _cubeMaterials[i].color = new Color(color.r, color.g, color.b, cubeAlpha);
+                _cubeMaterials[i].color = new Color(color.r, color.g, color.b, alpha);
             }
         }
 
         public void Dispose()
         {
-            if (_cubes != null)
-            {
-                foreach (var cube in _cubes)
-                {
-                    if (cube != null)
-                        UnityEngine.Object.Destroy(cube);
-                }
-                _cubes = null;
-            }
-
+            // Destroy materials first (not auto-destroyed with GameObjects)
             if (_cubeMaterials != null)
             {
                 foreach (var material in _cubeMaterials)
@@ -429,13 +478,17 @@ namespace FaraAccSupporter.Services
                 _cubeMaterials = null;
             }
 
+            _cubes = null;
+            _cubeRenderers = null;
+
+            // Destroying container also destroys all child cubes
             if (_container != null)
             {
                 UnityEngine.Object.Destroy(_container);
                 _container = null;
             }
 
-            _highlightedCubes.Clear();
+            Array.Clear(_cubeHighlighted, 0, TotalCubes);
             for (int i = 0; i < Rows; i++)
                 _rowCalibrated[i] = false;
             _isInitialized = false;

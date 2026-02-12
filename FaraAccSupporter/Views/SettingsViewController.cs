@@ -19,7 +19,7 @@ namespace FaraAccSupporter.Views
         private bool _enabled;
         private bool _vibrationEnabled;
         private bool _showTrajectory;
-        private bool _trajectoryTDEnabled;
+        private float _centerAccuracyTarget;
         private bool _preSwingGlow;
         private float _followThroughStrength;
         private bool _showNoteGrid;
@@ -65,14 +65,14 @@ namespace FaraAccSupporter.Views
             }
         }
 
-        [UIValue("trajectory-td-enabled")]
-        public bool TrajectoryTDEnabled
+        [UIValue("center-accuracy-target")]
+        public float CenterAccuracyTarget
         {
-            get => _trajectoryTDEnabled;
+            get => _centerAccuracyTarget;
             set
             {
-                _trajectoryTDEnabled = value;
-                PluginConfig.Instance.TrajectoryTDEnabled = value;
+                _centerAccuracyTarget = UnityEngine.Mathf.RoundToInt(value);
+                PluginConfig.Instance.CenterAccuracyTarget = (int)_centerAccuracyTarget;
                 PluginConfig.Instance.Changed();
             }
         }
@@ -162,7 +162,7 @@ namespace FaraAccSupporter.Views
             _enabled = PluginConfig.Instance.Enabled;
             _vibrationEnabled = PluginConfig.Instance.VibrationEnabled;
             _showTrajectory = PluginConfig.Instance.ShowTrajectoryLine;
-            _trajectoryTDEnabled = PluginConfig.Instance.TrajectoryTDEnabled;
+            _centerAccuracyTarget = PluginConfig.Instance.CenterAccuracyTarget;
             _preSwingGlow = PluginConfig.Instance.PreSwingGlowEnabled;
             _followThroughStrength = PluginConfig.Instance.FollowThroughVibrationStrength;
             _showNoteGrid = PluginConfig.Instance.ShowNoteGrid;
@@ -298,14 +298,14 @@ namespace FaraAccSupporter.Views
             }
         }
 
-        [UIValue("trajectory-td-enabled")]
-        public bool TrajectoryTDEnabled
+        [UIValue("center-accuracy-target")]
+        public float CenterAccuracyTarget
         {
-            get => _manager?.TrajectoryTDEnabled ?? true;
+            get => _manager?.CenterAccuracyTarget ?? 15f;
             set
             {
                 if (_manager != null)
-                    _manager.TrajectoryTDEnabled = value;
+                    _manager.CenterAccuracyTarget = value;
             }
         }
 
@@ -345,7 +345,7 @@ namespace FaraAccSupporter.Views
         [UIValue("note-grid-alpha")]
         public float NoteGridAlpha
         {
-            get => _manager?.NoteGridAlpha ?? 0.25f;
+            get => _manager?.NoteGridAlpha ?? 0.15f;
             set
             {
                 if (_manager != null)

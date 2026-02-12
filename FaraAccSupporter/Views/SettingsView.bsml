@@ -43,10 +43,13 @@
                   apply-on-change="true"
                   hover-hint="Show a line from each saber to its nearest matching note"/>
 
-  <toggle-setting text="TD/TI Aware Trajectory"
-                  value="trajectory-td-enabled"
+  <slider-setting text="Center Accuracy Target"
+                  value="center-accuracy-target"
+                  min="1"
+                  max="15"
+                  increment="1"
                   apply-on-change="true"
-                  hover-hint="When enabled, trajectory considers Time Dependency (outer notes show optimal cut position). When disabled, always points to note center."/>
+                  hover-hint="Sphere size at note center shows the zone for this many center accuracy points (15=smallest, 1=largest)"/>
 
   <horizontal>
     <text text="Note Grid Guide" font-size="4"/>
@@ -59,11 +62,11 @@
 
   <slider-setting text="Note Grid Opacity"
                   value="note-grid-alpha"
-                  min="0.1"
-                  max="1.0"
-                  increment="0.05"
+                  min="0.01"
+                  max="0.3"
+                  increment="0.01"
                   apply-on-change="true"
-                  hover-hint="Opacity of the note grid guide cubes"/>
+                  hover-hint="Opacity of note grid cubes and trajectory sphere axis lines (0.01=barely visible, 0.3=semi-transparent)"/>
 
   <toggle-setting text="Link RhythmMarker Z Offset"
                   value="link-rhythm-marker-z"
