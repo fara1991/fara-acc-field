@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/bsmg/BSIPA-MetadataSchema/master/Schema.json",
-  "id": "FaraAccSupporter",
-  "name": "FaraAccSupporter",
+  "id": "FaraAccField",
+  "name": "FaraAccField",
   "author": "Fara",
   "version": "0.1.0",
   "description": "Provides real-time feedback for achieving 115 points on notes. Vibrates when pre-swing (70pts) and follow-through (30pts) thresholds are met.",

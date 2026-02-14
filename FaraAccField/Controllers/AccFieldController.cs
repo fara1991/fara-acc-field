@@ -1,24 +1,22 @@
 using System;
 using System.Collections.Generic;
-using FaraAccSupporter.Configuration;
-using FaraAccSupporter.Models;
-using FaraAccSupporter.Patches;
-using FaraAccSupporter.Services;
+using FaraAccField.Configuration;
+using FaraAccField.Models;
+using FaraAccField.Services;
 using UnityEngine;
 using Zenject;
 
-namespace FaraAccSupporter.Controllers
+namespace FaraAccField.Controllers
 {
     /// <summary>
-    /// Main controller that coordinates pre-swing detection, follow-through tracking,
-    /// trajectory line display, and haptic feedback during gameplay.
+    /// Main controller that coordinates pre-swing detection,
+    /// trajectory line display, and note grid highlighting during gameplay.
     /// </summary>
-    internal class AccSupporterController : IInitializable, ITickable, IDisposable
+    internal class AccFieldController : IInitializable, ITickable, IDisposable
     {
         private readonly BeatmapObjectManager _beatmapObjectManager;
         private readonly SaberManager _saberManager;
         private readonly ColorManager? _colorManager;
-        private readonly HapticFeedbackService _hapticService;
         private readonly TrajectoryLineService _trajectoryService;
         private readonly NoteGlowService _noteGlowService;
         private readonly NoteGridService _noteGridService;
@@ -30,12 +28,6 @@ namespace FaraAccSupporter.Controllers
         // Track which notes have already triggered pre-swing haptic
         private readonly HashSet<NoteController> _preSwingTriggered = new();
 
-        // Track active cuts for follow-through detection
-        private readonly Dictionary<NoteController, CutTrackingData> _activeCuts = new();
-
-        // Follow-through tracking timeout
-        private const float FollowThroughTimeout = 0.4f;
-
         // Note grid highlight proximity threshold
         private const float GridHighlightZThreshold = 1.5f;
 
@@ -44,24 +36,22 @@ namespace FaraAccSupporter.Controllers
 
         // Reusable buffers to avoid per-frame List allocations.
         // Safe: all usage is sequential within single-threaded Tick().
-        private readonly List<Vector3> _trajectoryTargetBuffer = new(4);
-        private readonly List<NoteController> _completedCutsBuffer = new();
+        private readonly List<Vector3> _trajectoryTargetBuffer = new(16);
+        private readonly List<Vector3> _arrowDirectionBuffer = new(16);
         private readonly List<NoteController> _notesToUnhighlightBuffer = new();
 
         // First-tick SpawnController setup
         private bool _gridYInitialized;
 
-        public AccSupporterController(
+        public AccFieldController(
             BeatmapObjectManager beatmapObjectManager,
             SaberManager saberManager,
-            [InjectOptional] HapticFeedbackController? hapticController,
             [InjectOptional] ColorManager? colorManager)
         {
             _beatmapObjectManager = beatmapObjectManager;
             _saberManager = saberManager;
             _colorManager = colorManager;
 
-            _hapticService = new HapticFeedbackService(hapticController);
             _trajectoryService = new TrajectoryLineService();
             _noteGlowService = new NoteGlowService();
             _noteGridService = new NoteGridService();
@@ -72,7 +62,7 @@ namespace FaraAccSupporter.Controllers
         {
             if (!PluginConfig.Instance.Enabled)
             {
-                Plugin.Log?.Info("AccSupporterController: Disabled by config");
+                Plugin.Log?.Info("AccFieldController: Disabled by config");
                 return;
             }
 
@@ -80,9 +70,6 @@ namespace FaraAccSupporter.Controllers
             _beatmapObjectManager.noteWasSpawnedEvent += OnNoteSpawned;
             _beatmapObjectManager.noteWasCutEvent += OnNoteCut;
             _beatmapObjectManager.noteWasMissedEvent += OnNoteMissed;
-
-            // Subscribe to Harmony patch event for follow-through
-            NoteCutPatch.OnNoteCutEvent += HandleNoteCutForFollowThrough;
 
             // Get note colors from the game's color scheme
             Color? leftColor = null;
@@ -98,7 +85,7 @@ namespace FaraAccSupporter.Controllers
             _trajectoryService.Initialize(leftColor, rightColor);
             _noteGridService.Initialize(leftColor, rightColor);
 
-            Plugin.Log?.Info("AccSupporterController initialized");
+            Plugin.Log?.Info("AccFieldController initialized");
         }
 
         private void OnNoteSpawned(NoteController note)
@@ -122,30 +109,6 @@ namespace FaraAccSupporter.Controllers
             ResetNoteGridHighlight(note);
         }
 
-        /// <summary>
-        /// Called from Harmony patch when a note is cut.
-        /// Starts follow-through tracking.
-        /// </summary>
-        private void HandleNoteCutForFollowThrough(NoteController note, NoteCutInfo cutInfo)
-        {
-            if (note?.noteData == null)
-                return;
-
-            // Only track normal notes
-            if (note.noteData.gameplayType != NoteData.GameplayType.Normal)
-                return;
-
-            // Store cut data for follow-through tracking
-            _activeCuts[note] = new CutTrackingData
-            {
-                Note = note,
-                CutInfo = cutInfo,
-                CutDirection = _noteTrackingModel.GetNoteCutDirection(note),
-                StartTime = Time.time,
-                FollowThroughTriggered = false
-            };
-        }
-
         public void Tick()
         {
             var config = PluginConfig.Instance;
@@ -165,9 +128,6 @@ namespace FaraAccSupporter.Controllers
             // Process pre-swing for both sabers
             ProcessPreSwing(SaberType.SaberA, _leftSaberState, config);
             ProcessPreSwing(SaberType.SaberB, _rightSaberState, config);
-
-            // Process follow-through for active cuts
-            ProcessFollowThrough();
 
             // Update glow effects (pulse animation)
             _noteGlowService.Update();
@@ -233,51 +193,6 @@ namespace FaraAccSupporter.Controllers
             }
         }
 
-        private void ProcessFollowThrough()
-        {
-            _completedCutsBuffer.Clear();
-            float currentTime = Time.time;
-
-            foreach (var kvp in _activeCuts)
-            {
-                var tracking = kvp.Value;
-
-                // Check for timeout
-                if (currentTime - tracking.StartTime > FollowThroughTimeout)
-                {
-                    _completedCutsBuffer.Add(kvp.Key);
-                    continue;
-                }
-
-                // Skip if already triggered
-                if (tracking.FollowThroughTriggered)
-                    continue;
-
-                // Get the saber state based on which saber made the cut
-                var saberState = tracking.CutInfo.saberType == SaberType.SaberA
-                    ? _leftSaberState
-                    : _rightSaberState;
-
-                // Calculate follow-through angle
-                float angle = SwingAngleCalculator.CalculateFollowThroughAngle(
-                    saberState.BladeDirection,
-                    tracking.CutDirection);
-
-                // Check if threshold is met
-                if (SwingAngleCalculator.MeetsFollowThroughThreshold(angle))
-                {
-                    _hapticService.TriggerFollowThroughHaptic(tracking.CutInfo.saberType);
-                    tracking.FollowThroughTriggered = true;
-                }
-            }
-
-            // Clean up completed cuts
-            foreach (var note in _completedCutsBuffer)
-            {
-                _activeCuts.Remove(note);
-            }
-        }
-
         private void UpdateTrajectoryLines()
         {
             // Update left saber trajectory with multiple notes support
@@ -289,7 +204,7 @@ namespace FaraAccSupporter.Controllers
 
         private void UpdateSaberTrajectory(SaberType saberType, Vector3 saberPosition)
         {
-            var notes = _noteTrackingModel.GetNearestNotes(saberType, saberPosition);
+            var notes = _noteTrackingModel.GetAllNotesForSaber(saberType, saberPosition);
 
             if (notes.Count == 0)
             {
@@ -298,17 +213,19 @@ namespace FaraAccSupporter.Controllers
             }
 
             _trajectoryTargetBuffer.Clear();
+            _arrowDirectionBuffer.Clear();
             foreach (var note in notes)
             {
                 _trajectoryTargetBuffer.Add(note.noteTransform?.position ?? Vector3.zero);
+                _arrowDirectionBuffer.Add(_noteTrackingModel.GetNoteArrowDirection(note));
             }
 
-            _trajectoryService.UpdateTrajectories(saberType, saberPosition, _trajectoryTargetBuffer);
+            _trajectoryService.UpdateTrajectories(saberType, saberPosition, _trajectoryTargetBuffer, _arrowDirectionBuffer);
         }
 
         private void UpdateNoteGridHighlights(PluginConfig config)
         {
-            if (!config.ShowNoteGrid)
+            if (!config.ShowNotesGrid)
                 return;
 
             float gridZ = _noteGridService.CurrentZOffset;
@@ -327,15 +244,15 @@ namespace FaraAccSupporter.Controllers
 
                 float noteZ = note.noteTransform.position.z;
 
-                // When note is near grid Z, use its Y for calibration
-                if (noteZ >= gridZ - 0.3f && noteZ <= gridZ + 0.3f)
+                // When note is near saber Z=0, use its Y for calibration
+                if (noteZ >= -0.3f && noteZ <= 0.3f)
                 {
                     int lineLayer = kvp.Value.lineLayer;
                     float noteY = note.noteTransform.position.y;
                     _noteGridService.CalibrateYFromNote(lineLayer, noteY);
                 }
 
-                if (noteZ < gridZ - 0.1f)
+                if (noteZ < -0.1f)
                     _notesToUnhighlightBuffer.Add(note);
             }
 
@@ -358,13 +275,13 @@ namespace FaraAccSupporter.Controllers
                     continue;
 
                 float noteZ = note.noteTransform.position.z;
-                if (noteZ >= gridZ - 0.1f && noteZ <= gridZ + GridHighlightZThreshold)
+                if (noteZ >= -0.1f && noteZ <= GridHighlightZThreshold)
                 {
                     int lineIndex = note.noteData.lineIndex;
                     int lineLayer = (int)note.noteData.noteLineLayer;
                     bool isLeft = note.noteData.colorType == ColorType.ColorA;
 
-                    if (config.NoteGridDebugLog)
+                    if (config.NotesGridDebugLog)
                     {
                         var notePosition = note.noteTransform.position;
                         var side = isLeft ? "L" : "R";
@@ -402,7 +319,7 @@ namespace FaraAccSupporter.Controllers
                 float jumpOffsetY = spawnCtrl.jumpOffsetY;
                 float gridZ = _noteGridService.CurrentZOffset;
 
-                bool debugLog = PluginConfig.Instance.NoteGridDebugLog;
+                bool debugLog = PluginConfig.Instance.NotesGridDebugLog;
                 if (debugLog)
                     Plugin.Log?.Info($"SpawnController found: centerPos=({center.x:F3}, {center.y:F3}, {center.z:F3}), jumpOffsetY={jumpOffsetY:F3}, gridZ={gridZ:F3}");
 
@@ -424,7 +341,7 @@ namespace FaraAccSupporter.Controllers
 
         public void Dispose()
         {
-            Plugin.Log?.Info("AccSupporterController.Dispose called");
+            Plugin.Log?.Info("AccFieldController.Dispose called");
 
             // Unsubscribe from events
             if (_beatmapObjectManager != null)
@@ -434,8 +351,6 @@ namespace FaraAccSupporter.Controllers
                 _beatmapObjectManager.noteWasMissedEvent -= OnNoteMissed;
             }
 
-            NoteCutPatch.OnNoteCutEvent -= HandleNoteCutForFollowThrough;
-
             // Dispose services
             _trajectoryService.Dispose();
             _noteGlowService.Dispose();
@@ -444,24 +359,8 @@ namespace FaraAccSupporter.Controllers
             // Clear tracking data
             _noteTrackingModel.Clear();
             _preSwingTriggered.Clear();
-            _activeCuts.Clear();
             _gridHighlightedNotes.Clear();
             _gridYInitialized = false;
-
-            // Reset haptic service
-            _hapticService.Reset();
-        }
-
-        /// <summary>
-        /// Internal class for tracking active cuts and their follow-through status.
-        /// </summary>
-        private class CutTrackingData
-        {
-            public NoteController Note = null!;
-            public NoteCutInfo CutInfo;
-            public Vector3 CutDirection;
-            public float StartTime;
-            public bool FollowThroughTriggered;
         }
     }
 }

@@ -1,7 +1,7 @@
 using System;
 using HarmonyLib;
 
-namespace FaraAccSupporter.Patches
+namespace FaraAccField.Patches
 {
     /// <summary>
     /// Harmony patches for intercepting note cut events.

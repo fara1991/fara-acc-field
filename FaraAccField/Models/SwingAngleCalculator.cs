@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace FaraAccSupporter.Models
+namespace FaraAccField.Models
 {
     /// <summary>
     /// Calculates swing angles for pre-swing and follow-through scoring.

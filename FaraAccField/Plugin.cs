@@ -4,11 +4,11 @@ using IPA;
 using IPA.Config;
 using IPA.Config.Stores;
 using SiraUtil.Zenject;
-using FaraAccSupporter.Configuration;
-using FaraAccSupporter.Installers;
+using FaraAccField.Configuration;
+using FaraAccField.Installers;
 using IPALogger = IPA.Logging.Logger;
 
-namespace FaraAccSupporter
+namespace FaraAccField
 {
     [Plugin(RuntimeOptions.DynamicInit)]
     [NoEnableDisable]
@@ -28,14 +28,14 @@ namespace FaraAccSupporter
             PluginConfig.Instance = config.Generated<PluginConfig>();
 
             // Initialize Harmony
-            _harmony = new Harmony("com.fara.accsupporter");
+            _harmony = new Harmony("com.fara.accfield");
             _harmony.PatchAll(Assembly.GetExecutingAssembly());
 
             // Register installers
-            zenjector.Install<AccSupporterMenuInstaller>(Location.Menu);
-            zenjector.Install<AccSupporterGameInstaller>(Location.GameCore);
+            zenjector.Install<AccFieldMenuInstaller>(Location.Menu);
+            zenjector.Install<AccFieldGameInstaller>(Location.GameCore);
 
-            Log.Info("FaraAccSupporter initialized!");
+            Log.Info("FaraAccField initialized!");
         }
 
         [OnExit]

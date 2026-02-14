@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace FaraAccSupporter.Models
+namespace FaraAccField.Models
 {
     /// <summary>
     /// Tracks the state and movement history of a saber for angle calculations.

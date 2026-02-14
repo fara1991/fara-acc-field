@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using FaraAccSupporter.Configuration;
+using FaraAccField.Configuration;
 using UnityEngine;
 
-namespace FaraAccSupporter.Services
+namespace FaraAccField.Services
 {
     internal class NoteGridService : IDisposable
     {
@@ -65,7 +65,7 @@ namespace FaraAccSupporter.Services
             if (_isInitialized)
                 return;
 
-            if (!PluginConfig.Instance.ShowNoteGrid)
+            if (!PluginConfig.Instance.ShowNotesGrid)
                 return;
 
             if (leftColor.HasValue)
@@ -109,11 +109,11 @@ namespace FaraAccSupporter.Services
                     return;
                 }
 
-                float alpha = PluginConfig.Instance.NoteGridAlpha;
+                float alpha = PluginConfig.Instance.NotesGridAlpha;
                 _lastAlpha = alpha;
 
                 // Create container to parent all cubes for scene management safety
-                _container = new GameObject("AccSupporter_NoteGridContainer");
+                _container = new GameObject("AccField_NoteGridContainer");
                 _container.layer = 2; // Ignore Raycast
 
                 _cubes = new GameObject[TotalCubes];
@@ -127,7 +127,7 @@ namespace FaraAccSupporter.Services
                         var material = CreateCubeMaterial(shader, DefaultCubeColor, alpha);
                         _cubeMaterials[index] = material;
                         _cubes[index] = CreateGridCube(
-                            $"AccSupporter_NoteGrid_{row}_{col}",
+                            $"AccField_NoteGrid_{row}_{col}",
                             ColumnPositions[col],
                             _rowPositions[row],
                             _lastZOffset,
@@ -139,7 +139,7 @@ namespace FaraAccSupporter.Services
 
                 _isInitialized = true;
 
-                if (PluginConfig.Instance.NoteGridDebugLog)
+                if (PluginConfig.Instance.NotesGridDebugLog)
                 {
                     Plugin.Log?.Info($"NoteGridService initialized: {TotalCubes} cubes, Z={_lastZOffset:F2}, shader={_shaderName}, alpha={alpha:F2}, Y=[{_rowPositions[0]:F3}, {_rowPositions[1]:F3}, {_rowPositions[2]:F3}]");
                     for (int i = 0; i < TotalCubes; i++)
@@ -215,7 +215,7 @@ namespace FaraAccSupporter.Services
 
         /// <summary>
         /// Calibrates a row's Y position from an actual note passing near the grid Z.
-        /// Called from AccSupporterController when a note is close to grid Z.
+        /// Called from AccFieldController when a note is close to grid Z.
         /// </summary>
         public void CalibrateYFromNote(int lineLayer, float noteY)
         {
@@ -228,7 +228,7 @@ namespace FaraAccSupporter.Services
             _rowCalibrated[lineLayer] = true;
             _rowPositions[lineLayer] = noteY;
 
-            if (PluginConfig.Instance.NoteGridDebugLog)
+            if (PluginConfig.Instance.NotesGridDebugLog)
                 Plugin.Log?.Info($"NoteGrid Y runtime calibrated: layer {lineLayer} = {noteY:F3}");
 
             // Update cube positions for this row
@@ -262,7 +262,7 @@ namespace FaraAccSupporter.Services
             _cubeHighlighted[index] = true;
             var color = isLeftNote ? _leftNoteColor : _rightNoteColor;
             _highlightBaseColors[index] = color;
-            float alpha = PluginConfig.Instance.NoteGridAlpha;
+            float alpha = PluginConfig.Instance.NotesGridAlpha;
             _cubeMaterials[index].color = new Color(
                 Mathf.Clamp01(color.r * HighlightEmissionIntensity),
                 Mathf.Clamp01(color.g * HighlightEmissionIntensity),
@@ -280,7 +280,7 @@ namespace FaraAccSupporter.Services
 
             int index = lineLayer * Columns + lineIndex;
             _cubeHighlighted[index] = false;
-            float alpha = PluginConfig.Instance.NoteGridAlpha;
+            float alpha = PluginConfig.Instance.NotesGridAlpha;
             _cubeMaterials[index].color = new Color(DefaultCubeColor.r, DefaultCubeColor.g, DefaultCubeColor.b, alpha);
 
             // Reset scale
@@ -292,7 +292,7 @@ namespace FaraAccSupporter.Services
         {
             try
             {
-                _rhythmMarkerAvailable = IsRhythmMarkerLoaded();
+                _rhythmMarkerAvailable = VisualHelper.IsRhythmMarkerLoaded();
                 Plugin.Log?.Info(_rhythmMarkerAvailable
                     ? "FaraRhythmMarker detected"
                     : "FaraRhythmMarker not found; using default Z offset");
@@ -301,16 +301,6 @@ namespace FaraAccSupporter.Services
             {
                 _rhythmMarkerAvailable = false;
             }
-        }
-
-        private static bool IsRhythmMarkerLoaded()
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (assembly.GetName().Name == "FaraRhythmMarker")
-                    return true;
-            }
-            return false;
         }
 
         private float GetCurrentZOffset()
@@ -327,7 +317,7 @@ namespace FaraAccSupporter.Services
                 }
             }
 
-            return DefaultZOffset;
+            return PluginConfig.Instance.NotesGridZOffset;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -344,7 +334,7 @@ namespace FaraAccSupporter.Services
         public void Update()
         {
             var config = PluginConfig.Instance;
-            bool shouldShow = config.ShowNoteGrid;
+            bool shouldShow = config.ShowNotesGrid;
 
             if (shouldShow && !_isInitialized)
             {
@@ -368,7 +358,7 @@ namespace FaraAccSupporter.Services
             }
 
             // Check if alpha changed
-            float currentAlpha = config.NoteGridAlpha;
+            float currentAlpha = config.NotesGridAlpha;
             if (Math.Abs(currentAlpha - _lastAlpha) > 0.001f)
             {
                 _lastAlpha = currentAlpha;

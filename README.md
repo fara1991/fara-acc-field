@@ -1,12 +1,15 @@
-# FaraAccSupporter
+# FaraAccField
 
 Beat Saber用のModで、ノーツで115点を取るためのリアルタイムフィードバックを提供します。
 
 ## 機能
 
 - **プレスイング検出**: 振りかぶり角度が100°（70点満点の基準）に達したら対象ノーツが光る
-- **フォロースルー検出**: ノーツカット後、振り下ろし角度が60°（30点満点の基準）に達したらコントローラを振動
-- **軌道線表示**: セイバーから次のノーツへの線を描画（Time Dependency対応）
+- **軌道線表示**: セイバーから次のノーツへの線を描画
+- **中心精度表示**: ノーツ中心にセンター精度ゾーンの球体・X/Y/Z軸線・矢印インジケーターを表示
+- **ノーツグリッドガイド**: 12個の半透明キューブでノーツ通過位置を常時表示
+- **言語切替**: 設定画面の英語/日本語切り替え対応
+- **メニュープレビュー**: 設定画面でリアルタイムにプレビューを確認
 
 ## 動作環境
 
@@ -24,30 +27,43 @@ Beat Saber用のModで、ノーツで115点を取るためのリアルタイム�
 
 ## 導入手順
 
-1. [Releases](https://github.com/your-username/FaraAccSupporter/releases)ページから最新の`FaraAccSupporter.dll`をダウンロード
+1. [Releases](https://github.com/your-username/FaraAccField/releases)ページから最新の`FaraAccField.dll`をダウンロード
 2. ダウンロードしたDLLをBeat Saberのインストールフォルダ内の`Plugins`フォルダに配置
    ```
    Beat Saber/
    └── Plugins/
-       └── FaraAccSupporter.dll  ← ここに配置
+       └── FaraAccField.dll  ← ここに配置
    ```
 3. Beat Saberを起動
 
 ## 設定方法
 
 1. Beat Saberを起動
-2. メインメニュー左側のボタン一覧から「**FaraAccSupporter**」をクリック
+2. メインメニュー左側のボタン一覧から「**Fara Acc Field**」をクリック
 3. 設定画面が開きます
 
-### 設定項目
+詳しい設定項目の説明は [SETTINGS_GUIDE.md](SETTINGS_GUIDE.md) を参照してください。
 
-| 項目 | 説明 | デフォルト |
-|------|------|-----------|
-| **Enabled** | Modの有効/無効 | ON |
-| **Note Glow** | プレスイング達成時にノーツを光らせる | ON |
-| **Vibration Enabled** | フォロースルー達成時の振動フィードバック | ON |
-| **Vibration Strength** | フォロースルー達成時の振動強度（0.1〜1.0） | 0.5 |
-| **Show Trajectory Line** | セイバーからノーツへの軌道線表示 | ON |
+### 設定項目一覧
+
+| セクション | 項目 | 種類 | デフォルト |
+|-----------|------|------|-----------|
+| Common | Language | ドロップダウン | English |
+| Common | Enabled | ON/OFF | ON |
+| Common | Debug Position Log | ON/OFF | OFF |
+| Pre-Swing | Notes Glow | ON/OFF | ON |
+| Visual | Show Trajectory Line | ON/OFF | ON |
+| Visual | Show Center Sphere | ON/OFF | ON |
+| Visual | Center Accuracy Target | スライダー (1-15) | 15 |
+| Visual | Show Axis Lines | ON/OFF | ON |
+| Visual | Axis Line Length | スライダー (0.20-1.00) | 0.40 |
+| Visual | Axis Line Width | スライダー (0.01-0.05) | 0.03 |
+| Visual | Show Arrow Indicator | ON/OFF | ON |
+| Grid | Show Notes Grid | ON/OFF | ON |
+| Grid | Notes Grid Opacity | スライダー (0.01-0.30) | 0.15 |
+| Grid | Link FaraRhythmMarker Mod | ON/OFF | ON |
+| Grid | Z Offset Step | ドロップダウン | 0.10 |
+| Grid | Notes Grid Z Offset | スライダー (0.00-2.00) | 0.90 |
 
 ## スコアリングについて
 
@@ -59,20 +75,7 @@ Beat Saberのノーツ1個あたりの最大スコアは115点で、以下の3�
 | 中央精度 | 15点 | ノーツの中心を通過する |
 | フォロースルー | 30点 | カット後に60°以上振り下ろす |
 
-このModは**プレスイング**と**フォロースルー**の閾値達成をリアルタイムで検出し、振動でお知らせします。
-
-## Time Dependency（TD）対応
-
-軌道線はノーツの位置（列）に応じて表示が変わります：
-
-| 列 | タイプ | 軌道線の色 | 説明 |
-|----|--------|-----------|------|
-| 0, 3 (外側) | Time Independent | オレンジ/シアン | タイミングに依存しないカットが可能。最適なアプローチ角度を表示 |
-| 1, 2 (内側) | Time Dependent | 赤/青 | タイミングが重要。ノーツ中心への直線を表示 |
-
-**Time Independent (TI) カットとは？**
-
-外側のノーツ（列0と列3）では、カット平面がノーツの移動方向（Z軸）と平行になるように振ることで、タイミングに関係なく中央精度15点を取ることができます。このModでは、TIカットのための最適なアプローチ方向を軌道線で示します。
+このModは**プレスイング**の閾値達成をリアルタイムで検出してノーツ発光でお知らせし、**中央精度**のゾーンを球体で可視化します。
 
 ## ライセンス
 

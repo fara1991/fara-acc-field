@@ -5,12 +5,16 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <OutputType>Library</OutputType>
-    <AssemblyName>FaraAccSupporter</AssemblyName>
-    <RootNamespace>FaraAccSupporter</RootNamespace>
+    <AssemblyName>FaraAccField</AssemblyName>
+    <RootNamespace>FaraAccField</RootNamespace>
     <Version>0.1.0</Version>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FaraAccField.Tests" />
+  </ItemGroup>
 
   <PropertyGroup>
     <BeatSaberDir>$(USERPROFILE)\BSManager\BSInstances\1.29.1</BeatSaberDir>

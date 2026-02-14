@@ -1,13 +1,13 @@
-using FaraAccSupporter.Views;
+using FaraAccField.Views;
 using Zenject;
 
-namespace FaraAccSupporter.Installers
+namespace FaraAccField.Installers
 {
     /// <summary>
     /// Zenject installer for menu scene bindings.
     /// Binds the settings menu manager.
     /// </summary>
-    internal class AccSupporterMenuInstaller : Installer
+    internal class AccFieldMenuInstaller : Installer
     {
         public override void InstallBindings()
         {

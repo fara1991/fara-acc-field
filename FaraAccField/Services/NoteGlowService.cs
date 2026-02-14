@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using FaraAccSupporter.Configuration;
+using FaraAccField.Configuration;
 using UnityEngine;
 
-namespace FaraAccSupporter.Services
+namespace FaraAccField.Services
 {
     /// <summary>
     /// Manages visual glow effects on notes when pre-swing threshold is reached.
@@ -80,6 +80,7 @@ namespace FaraAccSupporter.Services
 
         /// <summary>
         /// Updates glow effects (pulse animation).
+        /// Removes entries for destroyed notes.
         /// </summary>
         public void Update()
         {
@@ -87,6 +88,7 @@ namespace FaraAccSupporter.Services
                 return;
 
             float time = Time.time;
+            List<NoteController>? staleKeys = null;
 
             foreach (var kvp in _activeGlows)
             {
@@ -94,14 +96,16 @@ namespace FaraAccSupporter.Services
                 var glowData = kvp.Value;
 
                 if (note == null || glowData.Renderers == null)
+                {
+                    staleKeys ??= new List<NoteController>();
+                    staleKeys.Add(note);
                     continue;
+                }
 
-                // Calculate pulse intensity
                 float elapsed = time - glowData.StartTime;
                 float pulse = Mathf.Lerp(GlowMinIntensity, GlowMaxIntensity,
                     (Mathf.Sin(elapsed * GlowPulseSpeed) + 1f) * 0.5f);
 
-                // Apply pulsing glow to all renderers
                 foreach (var renderer in glowData.Renderers)
                 {
                     if (renderer?.material != null)
@@ -109,6 +113,12 @@ namespace FaraAccSupporter.Services
                         ApplyGlowToMaterial(renderer.material, pulse);
                     }
                 }
+            }
+
+            if (staleKeys != null)
+            {
+                foreach (var key in staleKeys)
+                    _activeGlows.Remove(key);
             }
         }
 

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace FaraAccSupporter.Models
+namespace FaraAccField.Models
 {
     /// <summary>
     /// Tracks active notes and provides methods to find the nearest note for each saber.
@@ -20,6 +20,9 @@ namespace FaraAccSupporter.Models
 
         // Reusable buffer for GetActiveNotes snapshot
         private readonly List<NoteController> _activeNotesSnapshot = new();
+
+        // Reusable buffer for GetAllNotesForSaber
+        private readonly List<NoteController> _allForSaberResult = new();
 
         // Distance threshold for grouping "simultaneous" notes (notes at similar Z position)
         private const float SimultaneousNoteZThreshold = 0.3f;
@@ -40,6 +43,10 @@ namespace FaraAccSupporter.Models
         /// Gets multiple nearest upcoming notes for the specified saber type.
         /// Groups notes that are at similar Z positions (simultaneous notes).
         /// </summary>
+        /// <remarks>
+        /// Returns a shared internal buffer. Contents are only valid until the next call
+        /// to this method. Do not cache the returned list across frames.
+        /// </remarks>
         /// <param name="saberType">Which saber (left=SaberA/red notes, right=SaberB/blue notes)</param>
         /// <param name="saberPosition">Current saber position</param>
         /// <param name="maxCount">Maximum number of notes to return</param>
@@ -102,38 +109,70 @@ namespace FaraAccSupporter.Models
         }
 
         /// <summary>
-        /// Gets the cut direction vector for a note.
+        /// Gets all active notes for the specified saber type, sorted by Z (closest first).
+        /// Unlike GetNearestNotes, this returns every note ahead of the saber with no count limit.
+        /// </summary>
+        /// <remarks>
+        /// Returns a shared internal buffer. Contents are only valid until the next call
+        /// to this method. Do not cache the returned list across frames.
+        /// </remarks>
+        public List<NoteController> GetAllNotesForSaber(SaberType saberType, Vector3 saberPosition)
+        {
+            _allForSaberResult.Clear();
+
+            lock (_lock)
+            {
+                foreach (var note in _activeNotes)
+                {
+                    if (note == null || note.noteData == null)
+                        continue;
+
+                    if ((int)note.noteData.colorType != (int)saberType)
+                        continue;
+
+                    Vector3 notePos = note.noteTransform.position;
+                    if (notePos.z < saberPosition.z - 0.5f)
+                        continue;
+
+                    _allForSaberResult.Add(note);
+                }
+            }
+
+            _allForSaberResult.Sort((a, b) =>
+                a.noteTransform.position.z.CompareTo(b.noteTransform.position.z));
+
+            return _allForSaberResult;
+        }
+
+        /// <summary>
+        /// Gets the cut direction vector for a note in world space.
+        /// The note mesh arrow points in local Vector3.down, and noteTransform.rotation
+        /// encodes the cut direction, so rotation * down gives the swing direction.
         /// </summary>
         public Vector3 GetNoteCutDirection(NoteController note)
         {
             if (note?.noteData == null)
                 return Vector3.forward;
 
-            // Get the world-space cut direction based on note's rotation
-            Vector3 localCutDir = GetLocalCutDirection(note.noteData.cutDirection);
+            if (note.noteData.cutDirection == NoteCutDirection.Any)
+                return Vector3.forward;
 
-            // Transform by note's rotation to get world direction
-            return note.noteTransform.rotation * localCutDir;
+            return note.noteTransform.rotation * Vector3.down;
         }
 
         /// <summary>
-        /// Gets the local cut direction vector based on NoteCutDirection enum.
+        /// Gets the visual arrow direction for a note in world space.
+        /// Returns Vector3.zero for dot notes (NoteCutDirection.Any).
         /// </summary>
-        private Vector3 GetLocalCutDirection(NoteCutDirection cutDirection)
+        public Vector3 GetNoteArrowDirection(NoteController note)
         {
-            return cutDirection switch
-            {
-                NoteCutDirection.Up => Vector3.down,           // Swing down to cut up arrow
-                NoteCutDirection.Down => Vector3.up,           // Swing up to cut down arrow
-                NoteCutDirection.Left => Vector3.right,        // Swing right to cut left arrow
-                NoteCutDirection.Right => Vector3.left,        // Swing left to cut right arrow
-                NoteCutDirection.UpLeft => new Vector3(1, -1, 0).normalized,
-                NoteCutDirection.UpRight => new Vector3(-1, -1, 0).normalized,
-                NoteCutDirection.DownLeft => new Vector3(1, 1, 0).normalized,
-                NoteCutDirection.DownRight => new Vector3(-1, 1, 0).normalized,
-                NoteCutDirection.Any => Vector3.forward,       // Dot notes - any direction
-                _ => Vector3.forward
-            };
+            if (note?.noteData == null)
+                return Vector3.zero;
+
+            if (note.noteData.cutDirection == NoteCutDirection.Any)
+                return Vector3.zero;
+
+            return note.noteTransform.rotation * Vector3.down;
         }
 
         /// <summary>
@@ -191,6 +230,10 @@ namespace FaraAccSupporter.Models
         /// <summary>
         /// Gets a snapshot of all active notes for iteration.
         /// </summary>
+        /// <remarks>
+        /// Returns a shared internal buffer. Contents are only valid until the next call
+        /// to this method. Do not cache the returned list across frames.
+        /// </remarks>
         public List<NoteController> GetActiveNotes()
         {
             lock (_lock)
