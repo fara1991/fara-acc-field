@@ -5,10 +5,10 @@
   "author": "Fara",
   "version": "1.0.0",
   "description": "Provides real-time feedback for achieving 115 points on notes. Vibrates when pre-swing (70pts) and follow-through (30pts) thresholds are met.",
-  "gameVersion": "1.29.1",
+  "gameVersion": "1.40.8",
   "dependsOn": {
     "BSIPA": "^4.3.0",
-    "SiraUtil": "^3.0.0",
-    "BeatSaberMarkupLanguage": "^1.6.0"
+    "SiraUtil": "^3.1.0",
+    "BeatSaberMarkupLanguage": "^1.11.0"
   }
 }

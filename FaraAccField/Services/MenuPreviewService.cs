@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using FaraAccField.Configuration;
+using FaraAccField.Models;
 using UnityEngine;
+using UnityEngine.XR;
 
 namespace FaraAccField.Services
 {
@@ -23,12 +25,17 @@ namespace FaraAccField.Services
         private const float FakeNoteSpawnZBehind = 4.0f;
         private const float FakeNoteDestroyZBefore = 0.5f;
         private const float HighlightZThreshold = 1.0f;
+        private const float GlowCubeSize = 0.35f;
+        private const float GlowScale = 1.01f;
+        private const float GlowAlpha = 0.5f;
 
         private const float HighlightEmissionIntensity = 1.5f;
         private const float HighlightPulseSpeed = 4f;
 
         private const float SaberTipOffsetX = 0.3f;
         private const float SaberTipY = 1.0f;
+        private const float SaberLength = 0.8f;
+        private const float MinSwingAngularSpeed = 200f;
 
         private const float ArrowIndicatorScale = 0.40f;
 
@@ -69,6 +76,11 @@ namespace FaraAccField.Services
         private bool _isShowing;
         private Mesh? _triangleMesh;
         private bool _rhythmMarkerAvailable;
+        private Material? _glowMaterialLeft;
+        private Material? _glowMaterialRight;
+        private Transform? _xrOrigin;
+        private readonly SaberState _menuLeftSaber = new();
+        private readonly SaberState _menuRightSaber = new();
 
         private class FakeNote
         {
@@ -85,6 +97,8 @@ namespace FaraAccField.Services
             public int LineLayer;
             public bool IsLeft;
             public bool HasHighlighted;
+            public bool HasGlow;
+            public GameObject? GlowCube;
         }
 
         private class PreviewUpdater : MonoBehaviour
@@ -112,6 +126,7 @@ namespace FaraAccField.Services
 
                 var cam = Camera.main;
                 _cameraZ = cam != null ? cam.transform.position.z : 0f;
+                _xrOrigin = cam != null ? cam.transform.parent : null;
                 CheckRhythmMarkerAvailability();
                 float zOffset = GetResolvedZOffset();
                 _gridZ = _cameraZ + BasePreviewDistance + zOffset;
@@ -179,6 +194,16 @@ namespace FaraAccField.Services
                     out _rightTrajectoryObj, out _rightTrajectoryLine);
 
                 _triangleMesh = VisualHelper.CreateTriangleMesh();
+
+                // Glow materials for pre-swing preview
+                Shader? glowShader = Shader.Find("Particles/Additive")
+                    ?? Shader.Find("Sprites/Default")
+                    ?? Shader.Find("UI/Default");
+                if (glowShader != null)
+                {
+                    _glowMaterialLeft = CreateGlowMaterial(glowShader, LeftNoteColor);
+                    _glowMaterialRight = CreateGlowMaterial(glowShader, RightNoteColor);
+                }
 
                 _spawnTimer = 0f;
                 _isShowing = true;
@@ -276,6 +301,17 @@ namespace FaraAccField.Services
             {
                 UnityEngine.Object.Destroy(_triangleMesh);
                 _triangleMesh = null;
+            }
+
+            if (_glowMaterialLeft != null)
+            {
+                UnityEngine.Object.Destroy(_glowMaterialLeft);
+                _glowMaterialLeft = null;
+            }
+            if (_glowMaterialRight != null)
+            {
+                UnityEngine.Object.Destroy(_glowMaterialRight);
+                _glowMaterialRight = null;
             }
 
             _leftTrajectoryObj = null;
@@ -390,14 +426,21 @@ namespace FaraAccField.Services
                 SpawnFakeNote();
             }
 
+            // Update saber states from XR controllers (same as in-game SaberState tracking)
+            var (leftTip, leftHandle) = GetControllerPositions(XRNode.LeftHand,
+                new Vector3(-SaberTipOffsetX, SaberTipY + SaberLength, _cameraZ),
+                new Vector3(-SaberTipOffsetX, SaberTipY, _cameraZ));
+            var (rightTip, rightHandle) = GetControllerPositions(XRNode.RightHand,
+                new Vector3(SaberTipOffsetX, SaberTipY + SaberLength, _cameraZ),
+                new Vector3(SaberTipOffsetX, SaberTipY, _cameraZ));
+            _menuLeftSaber.UpdateState(leftTip, leftHandle, Time.time);
+            _menuRightSaber.UpdateState(rightTip, rightHandle, Time.time);
+
             TickNotes(dt, config, sphereRadius, axisHalfLen,
                 out var nearestLeft, out var nearestRight);
 
-            float saberZ = _cameraZ;
-            UpdateTrajectoryLine(_leftTrajectoryLine, config.ShowTrajectoryLine, nearestLeft,
-                new Vector3(-SaberTipOffsetX, SaberTipY, saberZ));
-            UpdateTrajectoryLine(_rightTrajectoryLine, config.ShowTrajectoryLine, nearestRight,
-                new Vector3(SaberTipOffsetX, SaberTipY, saberZ));
+            UpdateTrajectoryLine(_leftTrajectoryLine, config.ShowTrajectoryLine, nearestLeft, leftTip);
+            UpdateTrajectoryLine(_rightTrajectoryLine, config.ShowTrajectoryLine, nearestRight, rightTip);
 
             PulseHighlightedCubes();
         }
@@ -454,6 +497,28 @@ namespace FaraAccField.Services
                     nearestRight = note;
                 }
             }
+
+            // Apply glow using the same detection as in-game:
+            // actual saber blade direction from XR controller + angular speed gate + 100° angle check
+            if (config.PreSwingGlowEnabled)
+            {
+                ApplyGlowIfPreSwing(nearestLeft, _menuLeftSaber);
+                ApplyGlowIfPreSwing(nearestRight, _menuRightSaber);
+            }
+        }
+
+        private void ApplyGlowIfPreSwing(FakeNote? note, SaberState saberState)
+        {
+            if (note == null || note.HasGlow || note.GameObject == null)
+                return;
+
+            if (saberState.BladeAngularSpeed < MinSwingAngularSpeed)
+                return;
+
+            float angle = SwingAngleCalculator.CalculatePreSwingAngle(
+                saberState.BladeDirection, note.ArrowDirection);
+            if (SwingAngleCalculator.MeetsPreSwingThreshold(angle))
+                ApplyPreviewGlow(note);
         }
 
         private static void UpdateNoteVisuals(FakeNote note, Vector3 pos,
@@ -521,6 +586,40 @@ namespace FaraAccField.Services
                         Mathf.Clamp01(baseColor.b * pulseBrightness),
                         _cubeMaterials[i].color.a);
                 }
+            }
+        }
+
+        private readonly List<InputDevice> _xrDeviceBuffer = new(2);
+
+        private (Vector3 tip, Vector3 handle) GetControllerPositions(XRNode node,
+            Vector3 fallbackTip, Vector3 fallbackHandle)
+        {
+            try
+            {
+                _xrDeviceBuffer.Clear();
+                InputDevices.GetDevicesAtXRNode(node, _xrDeviceBuffer);
+
+                foreach (var device in _xrDeviceBuffer)
+                {
+                    if (device.TryGetFeatureValue(CommonUsages.devicePosition, out Vector3 localPos)
+                        && device.TryGetFeatureValue(CommonUsages.deviceRotation, out Quaternion localRot)
+                        && localPos.sqrMagnitude > 0.001f)
+                    {
+                        Vector3 handleLocal = localPos;
+                        Vector3 tipLocal = localPos + localRot * (Vector3.forward * SaberLength);
+
+                        if (_xrOrigin != null)
+                            return (_xrOrigin.TransformPoint(tipLocal), _xrOrigin.TransformPoint(handleLocal));
+
+                        return (tipLocal, handleLocal);
+                    }
+                }
+
+                return (fallbackTip, fallbackHandle);
+            }
+            catch
+            {
+                return (fallbackTip, fallbackHandle);
             }
         }
 
@@ -695,6 +794,49 @@ namespace FaraAccField.Services
 
             if (_cubes[index] != null)
                 _cubes[index].transform.localScale = Vector3.one * CubeScale;
+        }
+
+        private static Material CreateGlowMaterial(Shader shader, Color color)
+        {
+            var material = new Material(shader);
+            material.SetInt("_ZWrite", 0);
+            material.renderQueue = 3100;
+            material.color = new Color(color.r, color.g, color.b, GlowAlpha);
+            return material;
+        }
+
+        private void ApplyPreviewGlow(FakeNote note)
+        {
+            if (note.HasGlow || note.GameObject == null)
+                return;
+
+            var glowMat = note.IsLeft ? _glowMaterialLeft : _glowMaterialRight;
+            if (glowMat == null)
+                return;
+
+            note.HasGlow = true;
+
+            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = "AccField_PreviewGlow";
+            cube.layer = 2;
+
+            var collider = cube.GetComponent<Collider>();
+            if (collider != null)
+                UnityEngine.Object.DestroyImmediate(collider);
+
+            cube.transform.SetParent(note.GameObject.transform, false);
+            cube.transform.localPosition = Vector3.zero;
+            cube.transform.localScale = Vector3.one * (GlowCubeSize * GlowScale);
+
+            var renderer = cube.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = glowMat;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+
+            note.GlowCube = cube;
         }
 
         private static Material CreateMaterial(Shader shader, Color color, float alpha)

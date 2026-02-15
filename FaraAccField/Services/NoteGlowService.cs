@@ -1,32 +1,87 @@
 using System;
 using System.Collections.Generic;
-using FaraAccField.Configuration;
 using UnityEngine;
 
 namespace FaraAccField.Services
 {
     /// <summary>
     /// Manages visual glow effects on notes when pre-swing threshold is reached.
+    /// Creates a semi-transparent cube slightly larger than the note, parented to it.
     /// </summary>
     internal class NoteGlowService : IDisposable
     {
-        // Track notes with active glow and their original colors
         private readonly Dictionary<NoteController, GlowData> _activeGlows = new();
 
-        // Glow colors (bright, high emission)
-        private static readonly Color PreSwingGlowColor = new Color(1f, 1f, 0.5f, 1f) * 2f; // Bright yellow/white
+        private const float GlowScale = 1.01f;
+        private const float GlowAlpha = 0.5f;
 
-        // Glow pulse settings
-        private const float GlowPulseSpeed = 8f;
-        private const float GlowMinIntensity = 1.5f;
-        private const float GlowMaxIntensity = 3f;
+        private Color _leftColor = new Color(0.8f, 0.2f, 0.2f);
+        private Color _rightColor = new Color(0.2f, 0.4f, 0.9f);
+
+        private Material? _leftMaterial;
+        private Material? _rightMaterial;
+        private bool _initialized;
+
+        public void Initialize(Color? leftColor = null, Color? rightColor = null)
+        {
+            if (_initialized)
+                return;
+
+            if (leftColor.HasValue)
+                _leftColor = leftColor.Value;
+            if (rightColor.HasValue)
+                _rightColor = rightColor.Value;
+
+            string[] shaderNames =
+            {
+                "Particles/Additive",
+                "Sprites/Default",
+                "UI/Default",
+                "Legacy Shaders/Transparent/Diffuse",
+                "Standard"
+            };
+
+            Shader? shader = null;
+            string usedName = "";
+            foreach (var name in shaderNames)
+            {
+                shader = Shader.Find(name);
+                if (shader != null)
+                {
+                    usedName = name;
+                    break;
+                }
+            }
+
+            if (shader == null)
+            {
+                Plugin.Log?.Warn("NoteGlowService: No suitable shader found");
+                return;
+            }
+
+            _leftMaterial = CreateGlowMaterial(shader, _leftColor);
+            _rightMaterial = CreateGlowMaterial(shader, _rightColor);
+            _initialized = true;
+
+            Plugin.Log?.Info($"NoteGlowService initialized: shader={usedName}");
+        }
+
+        private static Material CreateGlowMaterial(Shader shader, Color color)
+        {
+            var material = new Material(shader);
+            material.SetInt("_ZWrite", 0);
+            material.renderQueue = 3100;
+            material.color = new Color(color.r, color.g, color.b, GlowAlpha);
+            return material;
+        }
 
         /// <summary>
-        /// Applies a glow effect to the specified note.
+        /// Creates a glow cube matching the note's visual mesh size * 1.01,
+        /// parented to noteTransform so it follows the note.
         /// </summary>
         public void ApplyGlow(NoteController note)
         {
-            if (note?.noteTransform == null)
+            if (!_initialized || note?.noteTransform == null || note.noteData == null)
                 return;
 
             if (_activeGlows.ContainsKey(note))
@@ -34,43 +89,54 @@ namespace FaraAccField.Services
 
             try
             {
-                // Find all renderers in the note
-                var renderers = note.noteTransform.GetComponentsInChildren<MeshRenderer>();
-                if (renderers == null || renderers.Length == 0)
-                {
-                    Plugin.Log?.Debug("No MeshRenderer found on note");
+                // Find the visual mesh to determine actual note size
+                var meshRenderer = note.noteTransform.GetComponentInChildren<MeshRenderer>();
+                if (meshRenderer == null)
                     return;
+
+                var meshFilter = meshRenderer.GetComponent<MeshFilter>();
+                if (meshFilter?.sharedMesh == null)
+                    return;
+
+                bool isLeft = note.noteData.colorType == ColorType.ColorA;
+                var material = isLeft ? _leftMaterial : _rightMaterial;
+                if (material == null)
+                    return;
+
+                // Calculate visual size from mesh local bounds * transform scale
+                Bounds meshBounds = meshFilter.sharedMesh.bounds;
+                Vector3 meshScale = meshRenderer.transform.lossyScale;
+                Vector3 visualSize = new Vector3(
+                    meshBounds.size.x * Mathf.Abs(meshScale.x),
+                    meshBounds.size.y * Mathf.Abs(meshScale.y),
+                    meshBounds.size.z * Mathf.Abs(meshScale.z));
+
+                var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                cube.name = "AccField_NoteGlow";
+                cube.layer = 2;
+
+                var collider = cube.GetComponent<Collider>();
+                if (collider != null)
+                    UnityEngine.Object.DestroyImmediate(collider);
+
+                // Position at the visual mesh center, match rotation, scale to visual size * 1.01
+                Vector3 meshWorldCenter = meshRenderer.transform.TransformPoint(meshBounds.center);
+                cube.transform.position = meshWorldCenter;
+                cube.transform.rotation = meshRenderer.transform.rotation;
+                cube.transform.localScale = visualSize * GlowScale;
+
+                // Parent to note for automatic position tracking (preserve world transform)
+                cube.transform.SetParent(note.noteTransform, true);
+
+                var glowRenderer = cube.GetComponent<MeshRenderer>();
+                if (glowRenderer != null)
+                {
+                    glowRenderer.sharedMaterial = material;
+                    glowRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    glowRenderer.receiveShadows = false;
                 }
 
-                var glowData = new GlowData
-                {
-                    Renderers = renderers,
-                    OriginalColors = new Color[renderers.Length],
-                    OriginalEmissions = new Color[renderers.Length],
-                    StartTime = Time.time
-                };
-
-                // Store original colors and apply glow
-                for (int i = 0; i < renderers.Length; i++)
-                {
-                    var renderer = renderers[i];
-                    if (renderer?.material == null)
-                        continue;
-
-                    var material = renderer.material;
-
-                    // Store original values
-                    if (material.HasProperty("_Color"))
-                        glowData.OriginalColors[i] = material.GetColor("_Color");
-
-                    if (material.HasProperty("_EmissionColor"))
-                        glowData.OriginalEmissions[i] = material.GetColor("_EmissionColor");
-
-                    // Apply initial glow
-                    ApplyGlowToMaterial(material, GlowMaxIntensity);
-                }
-
-                _activeGlows[note] = glowData;
+                _activeGlows[note] = new GlowData { GlowCube = cube };
             }
             catch (Exception ex)
             {
@@ -79,46 +145,32 @@ namespace FaraAccField.Services
         }
 
         /// <summary>
-        /// Updates glow effects (pulse animation).
-        /// Removes entries for destroyed notes.
+        /// Removes stale entries for destroyed notes.
         /// </summary>
         public void Update()
         {
             if (_activeGlows.Count == 0)
                 return;
 
-            float time = Time.time;
             List<NoteController>? staleKeys = null;
 
             foreach (var kvp in _activeGlows)
             {
-                var note = kvp.Key;
-                var glowData = kvp.Value;
-
-                if (note == null || glowData.Renderers == null)
+                if (kvp.Key == null || kvp.Value.GlowCube == null)
                 {
                     staleKeys ??= new List<NoteController>();
-                    staleKeys.Add(note);
-                    continue;
-                }
-
-                float elapsed = time - glowData.StartTime;
-                float pulse = Mathf.Lerp(GlowMinIntensity, GlowMaxIntensity,
-                    (Mathf.Sin(elapsed * GlowPulseSpeed) + 1f) * 0.5f);
-
-                foreach (var renderer in glowData.Renderers)
-                {
-                    if (renderer?.material != null)
-                    {
-                        ApplyGlowToMaterial(renderer.material, pulse);
-                    }
+                    staleKeys.Add(kvp.Key!);
                 }
             }
 
             if (staleKeys != null)
             {
                 foreach (var key in staleKeys)
+                {
+                    if (_activeGlows.TryGetValue(key, out var data) && data.GlowCube != null)
+                        UnityEngine.Object.Destroy(data.GlowCube);
                     _activeGlows.Remove(key);
+                }
             }
         }
 
@@ -127,73 +179,18 @@ namespace FaraAccField.Services
         /// </summary>
         public void RemoveGlow(NoteController note)
         {
-            if (note == null || !_activeGlows.TryGetValue(note, out var glowData))
+            if (note == null || !_activeGlows.TryGetValue(note, out var data))
                 return;
 
-            try
-            {
-                // Restore original colors
-                for (int i = 0; i < glowData.Renderers.Length; i++)
-                {
-                    var renderer = glowData.Renderers[i];
-                    if (renderer?.material == null)
-                        continue;
-
-                    var material = renderer.material;
-
-                    if (material.HasProperty("_Color") && i < glowData.OriginalColors.Length)
-                        material.SetColor("_Color", glowData.OriginalColors[i]);
-
-                    if (material.HasProperty("_EmissionColor") && i < glowData.OriginalEmissions.Length)
-                        material.SetColor("_EmissionColor", glowData.OriginalEmissions[i]);
-                }
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log?.Debug($"Error restoring note color: {ex.Message}");
-            }
+            if (data.GlowCube != null)
+                UnityEngine.Object.Destroy(data.GlowCube);
 
             _activeGlows.Remove(note);
         }
 
-        /// <summary>
-        /// Checks if a note currently has glow applied.
-        /// </summary>
         public bool HasGlow(NoteController note)
         {
             return note != null && _activeGlows.ContainsKey(note);
-        }
-
-        private void ApplyGlowToMaterial(Material material, float intensity)
-        {
-            if (material == null)
-                return;
-
-            // Try different shader property names used in Beat Saber
-            Color glowColor = PreSwingGlowColor * intensity;
-
-            if (material.HasProperty("_EmissionColor"))
-            {
-                material.SetColor("_EmissionColor", glowColor);
-            }
-
-            if (material.HasProperty("_Glow"))
-            {
-                material.SetFloat("_Glow", intensity);
-            }
-
-            if (material.HasProperty("_Bloom"))
-            {
-                material.SetFloat("_Bloom", intensity * 0.5f);
-            }
-
-            // Also brighten the base color slightly
-            if (material.HasProperty("_Color"))
-            {
-                Color baseColor = material.GetColor("_Color");
-                Color brightened = Color.Lerp(baseColor, Color.white, 0.3f);
-                material.SetColor("_Color", brightened);
-            }
         }
 
         /// <summary>
@@ -201,55 +198,35 @@ namespace FaraAccField.Services
         /// </summary>
         public void Clear()
         {
-            if (_activeGlows.Count == 0)
-                return;
-
-            // Create a copy of keys to avoid modification during enumeration
-            var notes = new List<NoteController>(_activeGlows.Keys);
-
-            foreach (var note in notes)
+            foreach (var kvp in _activeGlows)
             {
-                try
-                {
-                    if (_activeGlows.TryGetValue(note, out var glowData))
-                    {
-                        // Restore original colors
-                        for (int i = 0; i < glowData.Renderers.Length; i++)
-                        {
-                            var renderer = glowData.Renderers[i];
-                            if (renderer?.material == null)
-                                continue;
-
-                            var material = renderer.material;
-
-                            if (material.HasProperty("_Color") && i < glowData.OriginalColors.Length)
-                                material.SetColor("_Color", glowData.OriginalColors[i]);
-
-                            if (material.HasProperty("_EmissionColor") && i < glowData.OriginalEmissions.Length)
-                                material.SetColor("_EmissionColor", glowData.OriginalEmissions[i]);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Plugin.Log?.Debug($"Error restoring note color during clear: {ex.Message}");
-                }
+                if (kvp.Value.GlowCube != null)
+                    UnityEngine.Object.Destroy(kvp.Value.GlowCube);
             }
-
             _activeGlows.Clear();
         }
 
         public void Dispose()
         {
             Clear();
+
+            if (_leftMaterial != null)
+            {
+                UnityEngine.Object.Destroy(_leftMaterial);
+                _leftMaterial = null;
+            }
+            if (_rightMaterial != null)
+            {
+                UnityEngine.Object.Destroy(_rightMaterial);
+                _rightMaterial = null;
+            }
+
+            _initialized = false;
         }
 
         private class GlowData
         {
-            public MeshRenderer[] Renderers = null!;
-            public Color[] OriginalColors = null!;
-            public Color[] OriginalEmissions = null!;
-            public float StartTime;
+            public GameObject GlowCube = null!;
         }
     }
 }

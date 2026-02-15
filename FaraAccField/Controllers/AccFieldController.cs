@@ -28,6 +28,11 @@ namespace FaraAccField.Controllers
         // Track which notes have already triggered pre-swing haptic
         private readonly HashSet<NoteController> _preSwingTriggered = new();
 
+        // Minimum blade angular speed (degrees/sec) to consider the saber actively swinging.
+        // Prevents false glow triggers from the blade's resting orientation.
+        // Rest: ~0-50°/s, casual movement: ~50-150°/s, active swing: ~300-2000°/s.
+        private const float MinSwingAngularSpeed = 200f;
+
         // Note grid highlight proximity threshold
         private const float GridHighlightZThreshold = 1.5f;
 
@@ -83,6 +88,7 @@ namespace FaraAccField.Controllers
 
             // Initialize services with colors (grid starts with default Y, corrected on first tick)
             _trajectoryService.Initialize(leftColor, rightColor);
+            _noteGlowService.Initialize(leftColor, rightColor);
             _noteGridService.Initialize(leftColor, rightColor);
 
             Plugin.Log?.Info("AccFieldController initialized");
@@ -149,7 +155,7 @@ namespace FaraAccField.Controllers
                 var leftSaber = _saberManager.leftSaber;
                 _leftSaberState.UpdateState(
                     leftSaber.saberBladeTopPos,
-                    leftSaber.transform.rotation,
+                    leftSaber.saberBladeBottomPos,
                     Time.time);
             }
 
@@ -158,20 +164,25 @@ namespace FaraAccField.Controllers
                 var rightSaber = _saberManager.rightSaber;
                 _rightSaberState.UpdateState(
                     rightSaber.saberBladeTopPos,
-                    rightSaber.transform.rotation,
+                    rightSaber.saberBladeBottomPos,
                     Time.time);
             }
         }
 
         private void ProcessPreSwing(SaberType saberType, SaberState saberState, PluginConfig config)
         {
-            // Find the nearest note for this saber
+            // Find the nearest note for this saber (only the single closest note)
             var nearestNote = _noteTrackingModel.GetNearestNote(saberType, saberState.CurrentPosition);
             if (nearestNote == null)
                 return;
 
             // Skip if we already triggered for this note
             if (_preSwingTriggered.Contains(nearestNote))
+                return;
+
+            // Require active swing motion to avoid false triggers from resting blade orientation.
+            // Without this, down-notes always glow because the blade naturally points in the windup direction.
+            if (saberState.BladeAngularSpeed < MinSwingAngularSpeed)
                 return;
 
             // Get the cut direction for this note
@@ -305,6 +316,7 @@ namespace FaraAccField.Controllers
 
         private void InitializeGridYFromSpawnController()
         {
+#if BS_1_29_1
             try
             {
                 var spawnCtrl = UnityEngine.Object.FindObjectOfType<BeatmapObjectSpawnController>();
@@ -337,6 +349,10 @@ namespace FaraAccField.Controllers
             {
                 Plugin.Log?.Warn($"Failed to init grid Y from SpawnController: {ex.Message}");
             }
+#else
+            // 1.40.8+: SpawnController API changed; grid Y is calibrated from note positions at runtime
+            Plugin.Log?.Info("Grid Y initialization: using runtime note calibration (1.40.8+)");
+#endif
         }
 
         public void Dispose()

@@ -20,12 +20,8 @@ namespace FaraAccField.Models
         public Vector3 CurrentPosition { get; private set; }
 
         /// <summary>
-        /// Current saber rotation
-        /// </summary>
-        public Quaternion CurrentRotation { get; private set; }
-
-        /// <summary>
-        /// Direction the saber blade is pointing (up along the blade)
+        /// Direction from saber handle to blade tip (the actual blade direction).
+        /// Computed from real blade endpoint positions, not from rotation * axis.
         /// </summary>
         public Vector3 BladeDirection { get; private set; }
 
@@ -40,29 +36,47 @@ namespace FaraAccField.Models
         public float TipSpeed => TipVelocity.magnitude;
 
         /// <summary>
-        /// Updates the saber state with new position and rotation data.
+        /// Angular speed of the blade direction change (degrees per second).
+        /// High values indicate active swing motion; low values indicate rest.
         /// </summary>
-        public void UpdateState(Vector3 tipPosition, Quaternion rotation, float time)
+        public float BladeAngularSpeed { get; private set; }
+
+        /// <summary>
+        /// Updates the saber state with blade tip and handle positions.
+        /// BladeDirection is computed from (tipPosition - handlePosition).
+        /// </summary>
+        public void UpdateState(Vector3 tipPosition, Vector3 handlePosition, float time)
         {
             int prevIndex = (_historyIndex - 1 + HistorySize) % HistorySize;
 
+            // Compute blade direction from actual endpoint positions
+            Vector3 bladeDir = tipPosition - handlePosition;
+            if (bladeDir.sqrMagnitude > 0.0001f)
+                bladeDir = bladeDir.normalized;
+            else
+                bladeDir = Vector3.up;
+
             // Store current state in history
             _positionHistory[_historyIndex] = tipPosition;
-            _directionHistory[_historyIndex] = rotation * Vector3.up;
+            _directionHistory[_historyIndex] = bladeDir;
             _timeHistory[_historyIndex] = time;
 
             // Update current values
             CurrentPosition = tipPosition;
-            CurrentRotation = rotation;
-            BladeDirection = rotation * Vector3.up;
+            BladeDirection = bladeDir;
 
-            // Calculate velocity from history
+            // Calculate velocity and angular speed from history
             if (_historyCount > 0)
             {
                 float deltaTime = time - _timeHistory[prevIndex];
                 if (deltaTime > 0.0001f)
                 {
                     TipVelocity = (_positionHistory[_historyIndex] - _positionHistory[prevIndex]) / deltaTime;
+
+                    float angleDelta = Vector3.Angle(
+                        _directionHistory[_historyIndex],
+                        _directionHistory[prevIndex]);
+                    BladeAngularSpeed = angleDelta / deltaTime;
                 }
             }
 
@@ -100,6 +114,7 @@ namespace FaraAccField.Models
             _historyIndex = 0;
             _historyCount = 0;
             TipVelocity = Vector3.zero;
+            BladeAngularSpeed = 0f;
         }
     }
 }
