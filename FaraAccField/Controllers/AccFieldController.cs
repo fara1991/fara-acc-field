@@ -25,8 +25,15 @@ namespace FaraAccField.Controllers
         private readonly SaberState _leftSaberState = new();
         private readonly SaberState _rightSaberState = new();
 
-        // Track which notes have already triggered pre-swing haptic
+        // Track which notes have already triggered glow
         private readonly HashSet<NoteController> _preSwingTriggered = new();
+
+        // Set true only after successful Initialize(); Tick() is skipped when false
+        private bool _initialized;
+
+        // When Disappearing Arrows modifier is active, force-disable features
+        private bool _forceDisableNotesGrid;
+        private bool _forceDisableArrowIndicator;
 
         // Minimum blade angular speed (degrees/sec) to consider the saber actively swinging.
         // Prevents false glow triggers from the blade's resting orientation.
@@ -71,6 +78,25 @@ namespace FaraAccField.Controllers
                 return;
             }
 
+            // Check modifier flags set by Harmony patch before level start
+            if (Patches.ModifierWarningPatch.GhostNotesActive)
+            {
+                Plugin.Log?.Warn("Ghost Notes modifier is active — FaraAccField disabled for this level");
+                return;
+            }
+
+            if (Patches.ModifierWarningPatch.DisappearingArrowsActive)
+            {
+                _forceDisableArrowIndicator = true;
+                Plugin.Log?.Warn("Disappearing Arrows modifier is active — Show Direction disabled for this level");
+
+                if (PluginConfig.Instance.ShowNotesGrid)
+                {
+                    _forceDisableNotesGrid = true;
+                    Plugin.Log?.Warn("Disappearing Arrows modifier is active — Show Cut Position disabled for this level");
+                }
+            }
+
             // Subscribe to note events
             _beatmapObjectManager.noteWasSpawnedEvent += OnNoteSpawned;
             _beatmapObjectManager.noteWasCutEvent += OnNoteCut;
@@ -91,6 +117,13 @@ namespace FaraAccField.Controllers
             _noteGlowService.Initialize(leftColor, rightColor);
             _noteGridService.Initialize(leftColor, rightColor);
 
+            // Apply Custom Notes NoteSize to glow cube scaling.
+            // When AutoDisable is on, detection is deferred to first note (per-level check).
+            var (noteSize, autoDisable) = VisualHelper.GetCustomNotesSettings();
+            _noteGlowService.SetNoteScale(noteSize, autoDisable);
+            Plugin.Log?.Info($"CustomNotes: NoteSize={noteSize}, AutoDisable={autoDisable}");
+
+            _initialized = true;
             Plugin.Log?.Info("AccFieldController initialized");
         }
 
@@ -117,6 +150,9 @@ namespace FaraAccField.Controllers
 
         public void Tick()
         {
+            if (!_initialized)
+                return;
+
             var config = PluginConfig.Instance;
             if (!config.Enabled)
                 return;
@@ -131,9 +167,13 @@ namespace FaraAccField.Controllers
             // Update saber states
             UpdateSaberStates();
 
-            // Process pre-swing for both sabers
-            ProcessPreSwing(SaberType.SaberA, _leftSaberState, config);
-            ProcessPreSwing(SaberType.SaberB, _rightSaberState, config);
+            // Process target notes glow for both sabers
+            string glowCondition = config.GlowCondition;
+            if (glowCondition != "None")
+            {
+                ProcessTargetNotes(SaberType.SaberA, _leftSaberState, glowCondition);
+                ProcessTargetNotes(SaberType.SaberB, _rightSaberState, glowCondition);
+            }
 
             // Update glow effects (pulse animation)
             _noteGlowService.Update();
@@ -141,11 +181,12 @@ namespace FaraAccField.Controllers
             // Update trajectory lines
             UpdateTrajectoryLines();
 
-            // Update note grid guide
-            _noteGridService.Update();
-
-            // Update note grid highlighting based on note proximity
-            UpdateNoteGridHighlights(config);
+            // Update note grid guide (disabled when Disappearing Arrows forces it off)
+            if (!_forceDisableNotesGrid)
+            {
+                _noteGridService.Update();
+                UpdateNoteGridHighlights(config);
+            }
         }
 
         private void UpdateSaberStates()
@@ -169,38 +210,56 @@ namespace FaraAccField.Controllers
             }
         }
 
-        private void ProcessPreSwing(SaberType saberType, SaberState saberState, PluginConfig config)
+        private void ProcessTargetNotes(SaberType saberType, SaberState saberState, string glowCondition)
         {
-            // Find the nearest note for this saber (only the single closest note)
-            var nearestNote = _noteTrackingModel.GetNearestNote(saberType, saberState.CurrentPosition);
-            if (nearestNote == null)
+            var nearestNotes = _noteTrackingModel.GetNearestNotes(saberType, saberState.CurrentPosition);
+            if (nearestNotes.Count == 0)
                 return;
 
-            // Skip if we already triggered for this note
-            if (_preSwingTriggered.Contains(nearestNote))
-                return;
-
-            // Require active swing motion to avoid false triggers from resting blade orientation.
-            // Without this, down-notes always glow because the blade naturally points in the windup direction.
-            if (saberState.BladeAngularSpeed < MinSwingAngularSpeed)
-                return;
-
-            // Get the cut direction for this note
-            Vector3 cutDirection = _noteTrackingModel.GetNoteCutDirection(nearestNote);
-
-            // Calculate pre-swing angle using the saber's blade direction
-            float angle = SwingAngleCalculator.CalculatePreSwingAngle(
-                saberState.BladeDirection,
-                cutDirection);
-
-            // Check if threshold is met
-            if (SwingAngleCalculator.MeetsPreSwingThreshold(angle))
+            if (glowCondition == "Next")
             {
-                if (config.PreSwingGlowEnabled)
+                foreach (var note in nearestNotes)
                 {
-                    _noteGlowService.ApplyGlow(nearestNote);
+                    if (!_preSwingTriggered.Contains(note))
+                    {
+                        _noteGlowService.ApplyGlow(note);
+                        _preSwingTriggered.Add(note);
+                    }
                 }
-                _preSwingTriggered.Add(nearestNote);
+            }
+            else if (glowCondition == "PreSwing70")
+            {
+                bool allTriggered = true;
+                foreach (var note in nearestNotes)
+                {
+                    if (!_preSwingTriggered.Contains(note))
+                    {
+                        allTriggered = false;
+                        break;
+                    }
+                }
+                if (allTriggered)
+                    return;
+
+                if (saberState.BladeAngularSpeed < MinSwingAngularSpeed)
+                    return;
+
+                Vector3 cutDirection = _noteTrackingModel.GetNoteCutDirection(nearestNotes[0]);
+                float angle = SwingAngleCalculator.CalculatePreSwingAngle(
+                    saberState.BladeDirection,
+                    cutDirection);
+
+                if (SwingAngleCalculator.MeetsPreSwingThreshold(angle))
+                {
+                    foreach (var note in nearestNotes)
+                    {
+                        if (!_preSwingTriggered.Contains(note))
+                        {
+                            _noteGlowService.ApplyGlow(note);
+                            _preSwingTriggered.Add(note);
+                        }
+                    }
+                }
             }
         }
 
@@ -231,7 +290,8 @@ namespace FaraAccField.Controllers
                 _arrowDirectionBuffer.Add(_noteTrackingModel.GetNoteArrowDirection(note));
             }
 
-            _trajectoryService.UpdateTrajectories(saberType, saberPosition, _trajectoryTargetBuffer, _arrowDirectionBuffer);
+            _trajectoryService.UpdateTrajectories(saberType, saberPosition, _trajectoryTargetBuffer,
+                _forceDisableArrowIndicator ? null : _arrowDirectionBuffer);
         }
 
         private void UpdateNoteGridHighlights(PluginConfig config)
@@ -377,6 +437,9 @@ namespace FaraAccField.Controllers
             _preSwingTriggered.Clear();
             _gridHighlightedNotes.Clear();
             _gridYInitialized = false;
+            _initialized = false;
+            _forceDisableNotesGrid = false;
+            _forceDisableArrowIndicator = false;
         }
     }
 }

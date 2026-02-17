@@ -1,0 +1,8 @@
+<vertical preferred-width="80" spacing="6" pad="8">
+  <text text="FaraAccField" font-size="8" color="#B060E0" align="Center" bold="true"/>
+  <text text="~warning-text" font-size="4.5" align="Center" word-wrapping="true"/>
+  <horizontal pad-top="8" spacing="12">
+    <button text="Cancel" on-click="on-cancel-click" preferred-width="25"/>
+    <action-button text="OK" on-click="on-ok-click" preferred-width="25"/>
+  </horizontal>
+</vertical>

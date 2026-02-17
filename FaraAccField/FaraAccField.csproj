@@ -27,6 +27,7 @@
         <FaraRhythmMarkerDll Condition="Exists('$(BeatSaberDir)\Plugins\FaraRhythmMarker.dll')">$(BeatSaberDir)\Plugins\FaraRhythmMarker.dll</FaraRhythmMarkerDll>
         <FaraRhythmMarkerDll Condition="'$(FaraRhythmMarkerDll)' == '' AND Exists('$(BeatSaberDir_1_40_8)\Plugins\FaraRhythmMarker.dll')">$(BeatSaberDir_1_40_8)\Plugins\FaraRhythmMarker.dll</FaraRhythmMarkerDll>
         <FaraRhythmMarkerDll Condition="'$(FaraRhythmMarkerDll)' == '' AND Exists('$(BeatSaberDir_1_29_1)\Plugins\FaraRhythmMarker.dll')">$(BeatSaberDir_1_29_1)\Plugins\FaraRhythmMarker.dll</FaraRhythmMarkerDll>
+        <!-- CustomNotes: accessed via reflection at runtime (no compile-time reference) -->
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(BSVersion)' == '1.29.1'">
@@ -105,6 +106,10 @@
             <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
             <Private>false</Private>
         </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+            <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
         <Reference Include="Unity.TextMeshPro">
             <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Unity.TextMeshPro.dll</HintPath>
             <Private>false</Private>
@@ -143,10 +148,13 @@
             <HintPath>$(FaraRhythmMarkerDll)</HintPath>
             <Private>false</Private>
         </Reference>
+
+        <!-- CustomNotes: accessed via reflection only (no compile-time reference needed) -->
     </ItemGroup>
 
     <ItemGroup>
         <EmbeddedResource Include="Views\SettingsView.bsml"/>
+        <EmbeddedResource Include="Views\ModifierWarningView.bsml"/>
         <EmbeddedResource Include="manifest.$(BSVersion).json" Condition="Exists('manifest.$(BSVersion).json')">
             <LogicalName>$(RootNamespace).manifest.json</LogicalName>
         </EmbeddedResource>

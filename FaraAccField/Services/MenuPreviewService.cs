@@ -37,7 +37,8 @@ namespace FaraAccField.Services
         private const float SaberLength = 0.8f;
         private const float MinSwingAngularSpeed = 200f;
 
-        private const float ArrowIndicatorScale = 0.40f;
+        // Arrow indicator size is now controlled by config:
+        // PluginConfig.ArrowIndicatorWidth / ArrowIndicatorHeight
 
         private static readonly Vector3[] ArrowDirections =
         {
@@ -78,6 +79,7 @@ namespace FaraAccField.Services
         private bool _rhythmMarkerAvailable;
         private Material? _glowMaterialLeft;
         private Material? _glowMaterialRight;
+        private float _noteScale = 1f;
         private Transform? _xrOrigin;
         private readonly SaberState _menuLeftSaber = new();
         private readonly SaberState _menuRightSaber = new();
@@ -204,6 +206,10 @@ namespace FaraAccField.Services
                     _glowMaterialLeft = CreateGlowMaterial(glowShader, LeftNoteColor);
                     _glowMaterialRight = CreateGlowMaterial(glowShader, RightNoteColor);
                 }
+
+                // Menu preview always reflects configured NoteSize (not per-level AutoDisable)
+                var (noteSize, _) = VisualHelper.GetCustomNotesSettings();
+                _noteScale = noteSize;
 
                 _spawnTimer = 0f;
                 _isShowing = true;
@@ -498,9 +504,15 @@ namespace FaraAccField.Services
                 }
             }
 
-            // Apply glow using the same detection as in-game:
-            // actual saber blade direction from XR controller + angular speed gate + 100° angle check
-            if (config.PreSwingGlowEnabled)
+            string glowCondition = config.GlowCondition;
+            if (glowCondition == "Next")
+            {
+                if (nearestLeft != null && !nearestLeft.HasGlow)
+                    ApplyPreviewGlow(nearestLeft);
+                if (nearestRight != null && !nearestRight.HasGlow)
+                    ApplyPreviewGlow(nearestRight);
+            }
+            else if (glowCondition == "PreSwing70")
             {
                 ApplyGlowIfPreSwing(nearestLeft, _menuLeftSaber);
                 ApplyGlowIfPreSwing(nearestRight, _menuRightSaber);
@@ -548,9 +560,11 @@ namespace FaraAccField.Services
                 note.ArrowIndicator.SetActive(showArrow);
                 if (showArrow)
                 {
-                    float arrowOffset = sphereRadius + 0.333f * ArrowIndicatorScale;
+                    float arrowWidth = config.ArrowIndicatorWidth;
+                    float arrowHeight = config.ArrowIndicatorHeight;
+                    float arrowOffset = sphereRadius + 0.333f * arrowHeight;
                     note.ArrowIndicator.transform.localPosition = note.ArrowDirection * arrowOffset;
-                    note.ArrowIndicator.transform.localScale = Vector3.one * ArrowIndicatorScale;
+                    note.ArrowIndicator.transform.localScale = new Vector3(arrowWidth, arrowHeight, arrowWidth);
                 }
             }
         }
@@ -746,9 +760,11 @@ namespace FaraAccField.Services
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
 
-            float arrowOffset = sphereRadius + 0.333f * ArrowIndicatorScale;
+            float arrowWidth = PluginConfig.Instance.ArrowIndicatorWidth;
+            float arrowHeight = PluginConfig.Instance.ArrowIndicatorHeight;
+            float arrowOffset = sphereRadius + 0.333f * arrowHeight;
             arrow.transform.localPosition = arrowDir * arrowOffset;
-            arrow.transform.localScale = Vector3.one * ArrowIndicatorScale;
+            arrow.transform.localScale = new Vector3(arrowWidth, arrowHeight, arrowWidth);
 
             if (arrowDir != Vector3.zero)
                 arrow.transform.localRotation = Quaternion.FromToRotation(Vector3.up, arrowDir);
@@ -826,7 +842,7 @@ namespace FaraAccField.Services
 
             cube.transform.SetParent(note.GameObject.transform, false);
             cube.transform.localPosition = Vector3.zero;
-            cube.transform.localScale = Vector3.one * (GlowCubeSize * GlowScale);
+            cube.transform.localScale = Vector3.one * (GlowCubeSize * _noteScale * GlowScale);
 
             var renderer = cube.GetComponent<MeshRenderer>();
             if (renderer != null)

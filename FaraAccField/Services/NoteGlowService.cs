@@ -21,6 +21,10 @@ namespace FaraAccField.Services
         private Material? _leftMaterial;
         private Material? _rightMaterial;
         private bool _initialized;
+        private float _noteScale = 1f;
+        private float _customNotesNoteSize = 1f;
+        private bool _autoDisable;
+        private bool _noteScaleResolved;
 
         public void Initialize(Color? leftColor = null, Color? rightColor = null)
         {
@@ -75,6 +79,24 @@ namespace FaraAccField.Services
             return material;
         }
 
+        public void SetNoteScale(float noteSize, bool autoDisable)
+        {
+            _customNotesNoteSize = noteSize;
+            _autoDisable = autoDisable;
+            _noteScale = noteSize;
+
+            if (autoDisable)
+            {
+                // Defer: on first ApplyGlow, check if AutoDisable kicked in.
+                // If so, reset to 1.0. Until then, assume Custom Notes is active.
+                _noteScaleResolved = false;
+            }
+            else
+            {
+                _noteScaleResolved = true;
+            }
+        }
+
         /// <summary>
         /// Creates a glow cube matching the note's visual mesh size * 1.01,
         /// parented to noteTransform so it follows the note.
@@ -89,6 +111,11 @@ namespace FaraAccField.Services
 
             try
             {
+                // On first glow attempt with AutoDisable, inspect the note to detect
+                // whether Custom Notes is active for this level.
+                if (!_noteScaleResolved)
+                    ResolveNoteScale(note);
+
                 // Find the visual mesh to determine actual note size
                 var meshRenderer = note.noteTransform.GetComponentInChildren<MeshRenderer>();
                 if (meshRenderer == null)
@@ -123,7 +150,7 @@ namespace FaraAccField.Services
                 Vector3 meshWorldCenter = meshRenderer.transform.TransformPoint(meshBounds.center);
                 cube.transform.position = meshWorldCenter;
                 cube.transform.rotation = meshRenderer.transform.rotation;
-                cube.transform.localScale = visualSize * GlowScale;
+                cube.transform.localScale = visualSize * _noteScale * GlowScale;
 
                 // Parent to note for automatic position tracking (preserve world transform)
                 cube.transform.SetParent(note.noteTransform, true);
@@ -191,6 +218,37 @@ namespace FaraAccField.Services
         public bool HasGlow(NoteController note)
         {
             return note != null && _activeGlows.ContainsKey(note);
+        }
+
+        private void ResolveNoteScale(NoteController note)
+        {
+            _noteScaleResolved = true;
+
+            // When AutoDisable is on, check if Custom Notes actually scaled this note.
+            // If any descendant Transform has a lossyScale matching NoteSize,
+            // Custom Notes is active. Otherwise it was auto-disabled for this level.
+            var noteTransform = note.noteTransform;
+            if (noteTransform == null)
+                return;
+
+            var allTransforms = noteTransform.GetComponentsInChildren<Transform>(true);
+            foreach (var t in allTransforms)
+            {
+                if (t == noteTransform)
+                    continue;
+                float sx = t.lossyScale.x;
+                if (!Mathf.Approximately(sx, 1f)
+                    && Mathf.Abs(sx - _customNotesNoteSize) < 0.1f)
+                {
+                    _noteScale = _customNotesNoteSize;
+                    Plugin.Log?.Info($"AutoDisable: Custom Notes active ('{t.name}' lossyScale={sx:F3}), glow scale={_noteScale}");
+                    return;
+                }
+            }
+
+            // No scaled descendants found → Custom Notes is disabled for this level
+            _noteScale = 1f;
+            Plugin.Log?.Info("AutoDisable: Custom Notes not active for this level, glow scale=1.0");
         }
 
         /// <summary>
