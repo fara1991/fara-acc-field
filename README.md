@@ -4,10 +4,12 @@ Beat Saber用のModで、ノーツで115点を取るためのリアルタイム�
 
 ## 機能
 
-- **プレスイング検出**: 振りかぶり角度が100°（70点満点の基準）に達したら対象ノーツが光る
+- **対象ノーツ発光**: 条件に応じてノーツを光らせる（常時 / 次のノーツ / プレスイング100°達成時）
 - **軌道線表示**: セイバーから次のノーツへの補助線を描画
-- **中心精度表示**: ノーツ中心にセンター精度ゾーンの球体・X/Y/Z軸線・矢印インジケーターを表示
+- **中心精度表示**: ノーツ中心にセンター精度ゾーンの球体・X/Y/Z軸線を表示
+- **方向表示**: ノーツのカット方向を矢印インジケーターで表示
 - **ノーツグリッドガイド**: 12個の半透明キューブでノーツ通過位置を常時表示
+- **デバッグモード**: グリッド座標、ノーツ出現方向、カットスコアをログ出力
 - **言語切替**: 設定画面の英語/日本語切り替え対応
 - **メニュープレビュー**: 設定画面でリアルタイムにプレビューを確認（VRコントローラー連動）
 
@@ -75,20 +77,21 @@ dotnet build /p:BSVersion=1.40.8 /p:SecondBuild=true
 |-----------|------|------|-----------|
 | Common | Language | ドロップダウン | English |
 | Common | Enabled | ON/OFF | ON |
-| Common | Debug Position Log | ON/OFF | OFF |
-| Pre-Swing | Notes Glow | ON/OFF | ON |
-| Visual | Show Trajectory Line | ON/OFF | ON |
-| Visual | Show Center Sphere | ON/OFF | ON |
-| Visual | Center Accuracy Target | スライダー (1-15) | 15 |
-| Visual | Show Axis Lines | ON/OFF | ON |
-| Visual | Axis Line Length | スライダー (0.20-1.00) | 0.40 |
-| Visual | Axis Line Width | スライダー (0.01-0.05) | 0.03 |
-| Visual | Show Arrow Indicator | ON/OFF | ON |
-| Grid | Show Notes Grid | ON/OFF | ON |
-| Grid | Notes Grid Opacity | スライダー (0.01-0.30) | 0.15 |
-| Grid | Link FaraRhythmMarker Mod | ON/OFF | ON |
-| Grid | Z Offset Step | ドロップダウン | 0.10 |
-| Grid | Notes Grid Z Offset | スライダー (0.00-2.00) | 0.90 |
+| Target Notes Assist | Condition | ドロップダウン | Next |
+| Center-Point Assist | Show Trajectory Line | ON/OFF | ON |
+| Center-Point Assist | Show Center Sphere | ON/OFF | ON |
+| Center-Point Assist | Center Accuracy Target | スライダー (1-15) | 15 |
+| Center-Point Assist | Show Axis Lines | ON/OFF | ON |
+| Center-Point Assist | Axis Line Length | スライダー (0.20-1.00) | 0.50 |
+| Center-Point Assist | Axis Line Width | スライダー (0.01-0.05) | 0.03 |
+| Direction Assist | Show Direction | ON/OFF | ON |
+| Direction Assist | Direction Width | スライダー (0.10-1.00) | 0.50 |
+| Direction Assist | Direction Height | スライダー (0.10-1.00) | 0.50 |
+| Cut Position Assist | Show Cut Position | ON/OFF | ON |
+| Cut Position Assist | Opacity | スライダー (0.01-0.30) | 0.15 |
+| Cut Position Assist | Link FaraRhythmMarker Mod | ON/OFF | ON |
+| Cut Position Assist | Notes Grid Z Offset | スライダー (0.00-2.00) | 0.90 |
+| Debug | Debug Mode | ON/OFF | OFF |
 
 ## スコアリングについて
 

@@ -44,7 +44,7 @@ namespace FaraAccField.Configuration
         /// <summary>
         /// Length of the X/Y/Z axis lines extending from the note center sphere (0.20 - 1.00)
         /// </summary>
-        public virtual float AxisLineLength { get; set; } = 0.40f;
+        public virtual float AxisLineLength { get; set; } = 0.50f;
 
         /// <summary>
         /// Width of the X/Y/Z axis lines (0.001 - 0.05)
