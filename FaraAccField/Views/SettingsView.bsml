@@ -18,11 +18,6 @@
                   apply-on-change="true"
                   hover-hint="~enabled-hint"/>
 
-  <toggle-setting text="~debug-log-text"
-                  value="notes-grid-debug-log"
-                  apply-on-change="true"
-                  hover-hint="~debug-log-hint"/>
-
   <horizontal bg='panel-top' pad='2'>
     <text text="~target-notes-header" font-size="4" color="#B060E0" align="Center"/>
   </horizontal>
@@ -125,7 +120,8 @@
                   apply-on-change="true"
                   hover-hint="~grid-opacity-hint"/>
 
-  <toggle-setting text="~link-rhythm-text"
+  <toggle-setting id="link-rhythm-toggle"
+                  text="~link-rhythm-text"
                   value="link-rhythm-marker-z"
                   apply-on-change="true"
                   hover-hint="~link-rhythm-hint"/>
@@ -138,4 +134,13 @@
                   increment="0.01"
                   apply-on-change="true"
                   hover-hint="~z-offset-hint"/>
+
+  <horizontal bg='panel-top' pad='2'>
+    <text text="~debug-header" font-size="4" color="#B060E0" align="Center"/>
+  </horizontal>
+
+  <toggle-setting text="~debug-mode-text"
+                  value="debug-mode"
+                  apply-on-change="true"
+                  hover-hint="~debug-mode-hint"/>
 </settings-container>

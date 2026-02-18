@@ -98,9 +98,9 @@ namespace FaraAccField.Configuration
         public virtual float NotesGridZOffsetStep { get; set; } = 0.10f;
 
         /// <summary>
-        /// Whether to log note grid and note position coordinates for debugging
+        /// Debug mode: logs grid coordinates, note spawn directions, and cut scores
         /// </summary>
-        public virtual bool NotesGridDebugLog { get; set; } = false;
+        public virtual bool DebugMode { get; set; } = false;
 
         /// <summary>
         /// Called when config changes
@@ -125,7 +125,8 @@ namespace FaraAccField.Configuration
             NotesGridZOffsetStep = Math.Max(0.01f, Math.Min(0.10f, NotesGridZOffsetStep));
             if (GlowCondition != GlowConditions.None
                 && GlowCondition != GlowConditions.Next
-                && GlowCondition != GlowConditions.PreSwing70)
+                && GlowCondition != GlowConditions.PreSwing70
+                && GlowCondition != GlowConditions.Always)
                 GlowCondition = GlowConditions.Next;
             Plugin.Log?.Info($"Config reloaded: Enabled={Enabled}");
         }
@@ -136,5 +137,6 @@ namespace FaraAccField.Configuration
         public const string None = "None";
         public const string Next = "Next";
         public const string PreSwing70 = "PreSwing70";
+        public const string Always = "Always";
     }
 }

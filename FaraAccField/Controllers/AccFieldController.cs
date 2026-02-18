@@ -17,6 +17,7 @@ namespace FaraAccField.Controllers
         private readonly BeatmapObjectManager _beatmapObjectManager;
         private readonly SaberManager _saberManager;
         private readonly ColorManager? _colorManager;
+        private readonly ScoreController? _scoreController;
         private readonly TrajectoryLineService _trajectoryService;
         private readonly NoteGlowService _noteGlowService;
         private readonly NoteGridService _noteGridService;
@@ -52,17 +53,22 @@ namespace FaraAccField.Controllers
         private readonly List<Vector3> _arrowDirectionBuffer = new(16);
         private readonly List<NoteController> _notesToUnhighlightBuffer = new();
 
+        // Debug mode: track glow state at cut time, keyed by NoteData for scoring callback
+        private readonly Dictionary<NoteData, (string noteInfo, bool hadGlow)> _debugCutInfo = new();
+
         // First-tick SpawnController setup
         private bool _gridYInitialized;
 
         public AccFieldController(
             BeatmapObjectManager beatmapObjectManager,
             SaberManager saberManager,
-            [InjectOptional] ColorManager? colorManager)
+            [InjectOptional] ColorManager? colorManager,
+            [InjectOptional] ScoreController? scoreController)
         {
             _beatmapObjectManager = beatmapObjectManager;
             _saberManager = saberManager;
             _colorManager = colorManager;
+            _scoreController = scoreController;
 
             _trajectoryService = new TrajectoryLineService();
             _noteGlowService = new NoteGlowService();
@@ -102,6 +108,9 @@ namespace FaraAccField.Controllers
             _beatmapObjectManager.noteWasCutEvent += OnNoteCut;
             _beatmapObjectManager.noteWasMissedEvent += OnNoteMissed;
 
+            if (PluginConfig.Instance.DebugMode && _scoreController != null)
+                _scoreController.scoringForNoteFinishedEvent += OnScoringFinished;
+
             // Get note colors from the game's color scheme
             Color? leftColor = null;
             Color? rightColor = null;
@@ -125,15 +134,44 @@ namespace FaraAccField.Controllers
 
             _initialized = true;
             Plugin.Log?.Info("AccFieldController initialized");
+
+            if (PluginConfig.Instance.DebugMode)
+                LogAllSettings();
         }
 
         private void OnNoteSpawned(NoteController note)
         {
             _noteTrackingModel.OnNoteSpawned(note);
+
+            if (PluginConfig.Instance.GlowCondition == GlowConditions.Always
+                && note?.noteData != null
+                && note.noteData.gameplayType == NoteData.GameplayType.Normal
+                && !_glowTriggered.Contains(note))
+            {
+                _noteGlowService.ApplyGlow(note);
+                _glowTriggered.Add(note);
+            }
+
+            if (PluginConfig.Instance.DebugMode && note?.noteData != null
+                && note.noteData.gameplayType == NoteData.GameplayType.Normal)
+            {
+                var color = note.noteData.colorType == ColorType.ColorA ? "ColorA" : "ColorB";
+                var pos = note.noteTransform?.position ?? Vector3.zero;
+                Plugin.Log?.Info($"[Debug] NoteSpawned: {color} line={note.noteData.lineIndex} layer={(int)note.noteData.noteLineLayer} dir={note.noteData.cutDirection} pos=({pos.x:F2}, {pos.y:F2}, {pos.z:F2})");
+            }
         }
 
         private void OnNoteCut(NoteController note, in NoteCutInfo info)
         {
+            if (PluginConfig.Instance.DebugMode && note?.noteData != null
+                && note.noteData.gameplayType == NoteData.GameplayType.Normal
+                && info.allIsOK)
+            {
+                bool hadGlow = _noteGlowService.HasGlow(note);
+                var color = note.noteData.colorType == ColorType.ColorA ? "ColorA" : "ColorB";
+                _debugCutInfo[note.noteData] = ($"{color} dir={note.noteData.cutDirection}", hadGlow);
+            }
+
             _noteTrackingModel.OnNoteCut(note);
             _glowTriggered.Remove(note);
             _noteGlowService.RemoveGlow(note);
@@ -352,11 +390,11 @@ namespace FaraAccField.Controllers
                     int lineLayer = (int)note.noteData.noteLineLayer;
                     bool isLeft = note.noteData.colorType == ColorType.ColorA;
 
-                    if (config.NotesGridDebugLog)
+                    if (config.DebugMode)
                     {
                         var notePosition = note.noteTransform.position;
                         var side = isLeft ? "L" : "R";
-                        Plugin.Log?.Info($"  NoteHighlight[{side} line={lineIndex},layer={lineLayer}] pos=({notePosition.x:F3}, {notePosition.y:F3}, {notePosition.z:F3})");
+                        Plugin.Log?.Info($"[Debug] NoteHighlight[{side} line={lineIndex},layer={lineLayer}] pos=({notePosition.x:F3}, {notePosition.y:F3}, {notePosition.z:F3})");
                     }
 
                     _noteGridService.HighlightCube(lineIndex, lineLayer, isLeft);
@@ -391,9 +429,9 @@ namespace FaraAccField.Controllers
                 float jumpOffsetY = spawnCtrl.jumpOffsetY;
                 float gridZ = _noteGridService.CurrentZOffset;
 
-                bool debugLog = PluginConfig.Instance.NotesGridDebugLog;
+                bool debugLog = PluginConfig.Instance.DebugMode;
                 if (debugLog)
-                    Plugin.Log?.Info($"SpawnController found: centerPos=({center.x:F3}, {center.y:F3}, {center.z:F3}), jumpOffsetY={jumpOffsetY:F3}, gridZ={gridZ:F3}");
+                    Plugin.Log?.Info($"[Debug] SpawnController found: centerPos=({center.x:F3}, {center.y:F3}, {center.z:F3}), jumpOffsetY={jumpOffsetY:F3}, gridZ={gridZ:F3}");
 
                 for (int layer = 0; layer < 3; layer++)
                 {
@@ -401,7 +439,7 @@ namespace FaraAccField.Controllers
                         (NoteLineLayer)layer, gridZ);
                     float finalY = yAtDistance + jumpOffsetY;
                     if (debugLog)
-                        Plugin.Log?.Info($"  Layer {layer}: yAtDistance={yAtDistance:F3}, +jumpOffset={jumpOffsetY:F3} => Y={finalY:F3}");
+                        Plugin.Log?.Info($"[Debug] Layer {layer}: yAtDistance={yAtDistance:F3}, +jumpOffset={jumpOffsetY:F3} => Y={finalY:F3}");
                     _noteGridService.CalibrateYFromNote(layer, finalY);
                 }
             }
@@ -413,6 +451,35 @@ namespace FaraAccField.Controllers
             // 1.40.8+: SpawnController API changed; grid Y is calibrated from note positions at runtime
             Plugin.Log?.Info("Grid Y initialization: using runtime note calibration (1.40.8+)");
 #endif
+        }
+
+        private void LogAllSettings()
+        {
+            var c = PluginConfig.Instance;
+            Plugin.Log?.Info("[Debug] === FaraAccField Settings ===");
+            Plugin.Log?.Info($"[Debug] Common > Enabled: {c.Enabled}");
+            Plugin.Log?.Info($"[Debug] Target Notes Assist > Condition: {c.GlowCondition}");
+            Plugin.Log?.Info($"[Debug] Center-Point Assist > ShowTrajectory: {c.ShowTrajectoryLine}, ShowSphere: {c.ShowCenterSphere}, Target: {c.CenterAccuracyTarget}, ShowAxis: {c.ShowAxisLine}, AxisLength: {c.AxisLineLength:F2}, AxisWidth: {c.AxisLineWidth:F2}");
+            Plugin.Log?.Info($"[Debug] Direction Assist > ShowArrow: {c.ShowArrowIndicator}, Width: {c.ArrowIndicatorWidth:F2}, Height: {c.ArrowIndicatorHeight:F2}");
+            Plugin.Log?.Info($"[Debug] Cut Position Assist > ShowGrid: {c.ShowNotesGrid}, Alpha: {c.NotesGridAlpha:F2}, LinkRhythmZ: {c.LinkRhythmMarkerZOffset}, ZOffset: {c.NotesGridZOffset:F2}");
+            Plugin.Log?.Info($"[Debug] Modifiers > GhostNotes: {Patches.ModifierWarningPatch.GhostNotesActive}, DisappearingArrows: {Patches.ModifierWarningPatch.DisappearingArrowsActive}");
+        }
+
+        private void OnScoringFinished(ScoringElement element)
+        {
+            if (element is GoodCutScoringElement goodCut
+                && _debugCutInfo.TryGetValue(element.noteData, out var info))
+            {
+                _debugCutInfo.Remove(element.noteData);
+                var buffer = goodCut.cutScoreBuffer;
+                if (buffer != null)
+                {
+                    int pre = buffer.beforeCutScore;
+                    int center = buffer.centerDistanceCutScore;
+                    int follow = buffer.afterCutScore;
+                    Plugin.Log?.Info($"[Debug] NoteCut: {info.noteInfo} pre={pre} center={center} follow={follow} total={pre + center + follow} glowCleanup={info.hadGlow}");
+                }
+            }
         }
 
         public void Dispose()
@@ -427,6 +494,9 @@ namespace FaraAccField.Controllers
                 _beatmapObjectManager.noteWasMissedEvent -= OnNoteMissed;
             }
 
+            if (_scoreController != null)
+                _scoreController.scoringForNoteFinishedEvent -= OnScoringFinished;
+
             // Dispose services
             _trajectoryService.Dispose();
             _noteGlowService.Dispose();
@@ -436,6 +506,7 @@ namespace FaraAccField.Controllers
             _noteTrackingModel.Clear();
             _glowTriggered.Clear();
             _gridHighlightedNotes.Clear();
+            _debugCutInfo.Clear();
             _gridYInitialized = false;
             _initialized = false;
             _forceDisableNotesGrid = false;

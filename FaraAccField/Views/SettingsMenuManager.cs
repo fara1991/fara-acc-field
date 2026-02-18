@@ -34,7 +34,7 @@ namespace FaraAccField.Views
         private float _notesGridAlpha;
         private bool _linkRhythmMarkerZ;
         private float _notesGridZOffset;
-        private bool _notesGridDebugLog;
+        private bool _debugMode;
 
         #region UI Values
 
@@ -179,7 +179,7 @@ namespace FaraAccField.Views
         }
 
         [UIValue("glow-condition-options")]
-        public List<object> GlowConditionOptions => new List<object> { GlowConditions.None, GlowConditions.Next, GlowConditions.PreSwing70 };
+        public List<object> GlowConditionOptions => new List<object> { GlowConditions.None, GlowConditions.Next, GlowConditions.PreSwing70, GlowConditions.Always };
 
         [UIValue("glow-condition")]
         public string GlowCondition
@@ -250,14 +250,14 @@ namespace FaraAccField.Views
             }
         }
 
-        [UIValue("notes-grid-debug-log")]
-        public bool NotesGridDebugLog
+        [UIValue("debug-mode")]
+        public bool DebugMode
         {
-            get => _notesGridDebugLog;
+            get => _debugMode;
             set
             {
-                _notesGridDebugLog = value;
-                PluginConfig.Instance.NotesGridDebugLog = value;
+                _debugMode = value;
+                PluginConfig.Instance.DebugMode = value;
                 PluginConfig.Instance.Changed();
             }
         }
@@ -288,7 +288,7 @@ namespace FaraAccField.Views
             _notesGridAlpha = PluginConfig.Instance.NotesGridAlpha;
             _linkRhythmMarkerZ = PluginConfig.Instance.LinkRhythmMarkerZOffset;
             _notesGridZOffset = PluginConfig.Instance.NotesGridZOffset;
-            _notesGridDebugLog = PluginConfig.Instance.NotesGridDebugLog;
+            _debugMode = PluginConfig.Instance.DebugMode;
         }
 
         private void RegisterSettingsMenu()

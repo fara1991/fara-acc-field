@@ -502,7 +502,15 @@ namespace FaraAccField.Services
             }
 
             string glowCondition = config.GlowCondition;
-            if (glowCondition == GlowConditions.Next)
+            if (glowCondition == GlowConditions.Always)
+            {
+                foreach (var n in _fakeNotes)
+                {
+                    if (!n.HasGlow)
+                        ApplyPreviewGlow(n);
+                }
+            }
+            else if (glowCondition == GlowConditions.Next)
             {
                 if (nearestLeft != null && !nearestLeft.HasGlow)
                     ApplyPreviewGlow(nearestLeft);

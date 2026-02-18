@@ -47,12 +47,15 @@ namespace FaraAccField.Views
         [UIValue("enabled-hint")]
         public string EnabledHint => L("Enable or disable the acc field mod", "MOD全体の有効/無効を切り替えます");
 
-        [UIValue("debug-log-text")]
-        public string DebugLogText => L("Debug Position Log", "デバッグ座標ログ");
-        [UIValue("debug-log-hint")]
-        public string DebugLogHint => L(
-            "Log grid cube and notes X/Y/Z coordinates to file for debugging",
-            "グリッドキューブとノーツの座標をログに出力します（デバッグ用）");
+        [UIValue("debug-header")]
+        public string DebugHeader => L("Debug", "デバッグ");
+
+        [UIValue("debug-mode-text")]
+        public string DebugModeText => L("Debug Mode", "デバッグモード");
+        [UIValue("debug-mode-hint")]
+        public string DebugModeHint => L(
+            "Log grid coordinates, note spawn directions, and cut scores to file for debugging",
+            "グリッド座標、ノーツの出現方向、カットスコアをログに出力します（デバッグ用）");
 
         [UIValue("condition-text")]
         public string ConditionText => L("Condition", "条件");
@@ -162,8 +165,9 @@ namespace FaraAccField.Views
             NotifyPropertyChanged(nameof(LanguageHint));
             NotifyPropertyChanged(nameof(EnabledText));
             NotifyPropertyChanged(nameof(EnabledHint));
-            NotifyPropertyChanged(nameof(DebugLogText));
-            NotifyPropertyChanged(nameof(DebugLogHint));
+            NotifyPropertyChanged(nameof(DebugHeader));
+            NotifyPropertyChanged(nameof(DebugModeText));
+            NotifyPropertyChanged(nameof(DebugModeHint));
             NotifyPropertyChanged(nameof(ConditionText));
             NotifyPropertyChanged(nameof(ConditionHint));
             NotifyPropertyChanged(nameof(ShowTrajectoryText));
@@ -202,7 +206,7 @@ namespace FaraAccField.Views
         public List<object> LanguageOptions => _manager?.LanguageOptions ?? new List<object> { "English", "Japanese" };
 
         [UIValue("glow-condition-options")]
-        public List<object> GlowConditionOptions => _manager?.GlowConditionOptions ?? new List<object> { GlowConditions.None, GlowConditions.Next, GlowConditions.PreSwing70 };
+        public List<object> GlowConditionOptions => _manager?.GlowConditionOptions ?? new List<object> { GlowConditions.None, GlowConditions.Next, GlowConditions.PreSwing70, GlowConditions.Always };
 
         [UIAction("glow-condition-formatter")]
         private string FormatGlowCondition(string value)
@@ -212,6 +216,7 @@ namespace FaraAccField.Views
                 GlowConditions.None => L("None", "なし"),
                 GlowConditions.Next => L("Next", "次のノーツ"),
                 GlowConditions.PreSwing70 => L("Pre-Swing 70pts", "プリスイング 70pts"),
+                GlowConditions.Always => L("Always", "常時"),
                 _ => value
             };
         }
@@ -410,6 +415,9 @@ namespace FaraAccField.Views
 
         [UIObject("z-offset-slider")]
         private UnityEngine.GameObject? _zOffsetSliderObj;
+
+        [UIObject("link-rhythm-toggle")]
+        private UnityEngine.GameObject? _linkRhythmToggleObj;
 #pragma warning restore CS0649
 
         [UIAction("#post-parse")]
@@ -438,8 +446,9 @@ namespace FaraAccField.Views
 
             bool gridOn = _manager?.ShowNotesGrid ?? true;
             SetChildrenInteractable(_gridOpacitySliderObj, gridOn);
+            SetChildrenInteractable(_linkRhythmToggleObj, gridOn);
 
-            bool zOffsetOn = _manager?.ZOffsetInteractable ?? false;
+            bool zOffsetOn = gridOn && (_manager?.ZOffsetInteractable ?? false);
             SetChildrenInteractable(_zOffsetSliderObj, zOffsetOn);
         }
 
@@ -464,14 +473,14 @@ namespace FaraAccField.Views
             }
         }
 
-        [UIValue("notes-grid-debug-log")]
-        public bool NotesGridDebugLog
+        [UIValue("debug-mode")]
+        public bool DebugMode
         {
-            get => _manager?.NotesGridDebugLog ?? false;
+            get => _manager?.DebugMode ?? false;
             set
             {
                 if (_manager != null)
-                    _manager.NotesGridDebugLog = value;
+                    _manager.DebugMode = value;
             }
         }
 

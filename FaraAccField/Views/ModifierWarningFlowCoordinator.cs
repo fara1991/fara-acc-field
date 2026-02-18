@@ -10,6 +10,7 @@ namespace FaraAccField.Views
         private Action? _onOk;
         private Action? _onCancel;
         private HMUI.FlowCoordinator? _presentingFC;
+        private bool _dismissed;
 
         public void Setup(ModifierWarningView viewController, Action onOk, Action onCancel,
             HMUI.FlowCoordinator presentingFC)
@@ -42,7 +43,9 @@ namespace FaraAccField.Views
         protected override void DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
         {
             base.DidDeactivate(removedFromHierarchy, screenSystemDisabling);
-            if (removedFromHierarchy)
+            // Safety net: clear stored state only if FC was removed without explicit OK/Cancel
+            // (e.g., parent FC dismissed, scene transition)
+            if (removedFromHierarchy && !_dismissed)
                 ModifierWarningPatch.ClearStoredState();
         }
 
@@ -55,8 +58,7 @@ namespace FaraAccField.Views
         {
             try
             {
-                // Dismiss immediately (no animation) to restore FC hierarchy
-                // before the level transition starts
+                _dismissed = true;
                 var parent = _presentingFC ?? BeatSaberUI.MainFlowCoordinator;
                 parent.DismissFlowCoordinator(this,
                     null,
@@ -74,7 +76,7 @@ namespace FaraAccField.Views
         {
             try
             {
-                // Dismiss from the FC that presented us
+                _dismissed = true;
                 var parent = _presentingFC ?? BeatSaberUI.MainFlowCoordinator;
                 parent.DismissFlowCoordinator(this);
                 _onCancel?.Invoke();

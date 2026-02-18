@@ -15,9 +15,14 @@ namespace FaraAccField.Services
             return kMaxCenterDistance * (15.5f - centerTarget) / 15f;
         }
 
+        // Distance from the triangle mesh pivot (centroid) to its base edge.
+        // The mesh vertices are at y=0.667 (top) and y=-0.333 (base), so the
+        // base sits 1/3 of the total height below the pivot.
+        private const float ArrowPivotToBase = 1f / 3f;
+
         public static float CalculateArrowOffset(float sphereRadius, float arrowHeight)
         {
-            return sphereRadius + 0.333f * arrowHeight;
+            return sphereRadius + ArrowPivotToBase * arrowHeight;
         }
 
         public static Mesh CreateTriangleMesh()
