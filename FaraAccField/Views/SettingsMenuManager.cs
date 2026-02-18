@@ -27,13 +27,14 @@ namespace FaraAccField.Views
         private float _axisLineWidth;
         private bool _showAxisLine;
         private bool _showArrowIndicator;
-        private bool _preSwingGlow;
+        private float _arrowIndicatorWidth;
+        private float _arrowIndicatorHeight;
+        private string _glowCondition = null!;
         private bool _showNotesGrid;
         private float _notesGridAlpha;
         private bool _linkRhythmMarkerZ;
         private float _notesGridZOffset;
-        private float _notesGridZOffsetStep;
-        private bool _notesGridDebugLog;
+        private bool _debugMode;
 
         #region UI Values
 
@@ -149,17 +150,45 @@ namespace FaraAccField.Views
                 _showArrowIndicator = value;
                 PluginConfig.Instance.ShowArrowIndicator = value;
                 PluginConfig.Instance.Changed();
+                _modalView?.NotifyInteractableChanged();
             }
         }
 
-        [UIValue("pre-swing-glow")]
-        public bool PreSwingGlow
+        [UIValue("arrow-indicator-width")]
+        public float ArrowIndicatorWidth
         {
-            get => _preSwingGlow;
+            get => _arrowIndicatorWidth;
             set
             {
-                _preSwingGlow = value;
-                PluginConfig.Instance.PreSwingGlowEnabled = value;
+                _arrowIndicatorWidth = value;
+                PluginConfig.Instance.ArrowIndicatorWidth = value;
+                PluginConfig.Instance.Changed();
+            }
+        }
+
+        [UIValue("arrow-indicator-height")]
+        public float ArrowIndicatorHeight
+        {
+            get => _arrowIndicatorHeight;
+            set
+            {
+                _arrowIndicatorHeight = value;
+                PluginConfig.Instance.ArrowIndicatorHeight = value;
+                PluginConfig.Instance.Changed();
+            }
+        }
+
+        [UIValue("glow-condition-options")]
+        public List<object> GlowConditionOptions => new List<object> { GlowConditions.None, GlowConditions.Next, GlowConditions.PreSwing70, GlowConditions.Always };
+
+        [UIValue("glow-condition")]
+        public string GlowCondition
+        {
+            get => _glowCondition;
+            set
+            {
+                _glowCondition = value;
+                PluginConfig.Instance.GlowCondition = value;
                 PluginConfig.Instance.Changed();
             }
         }
@@ -208,21 +237,6 @@ namespace FaraAccField.Views
         [UIValue("z-offset-interactable")]
         public bool ZOffsetInteractable => !_linkRhythmMarkerZ;
 
-        [UIValue("z-offset-step-options")]
-        public List<object> ZOffsetStepOptions => new List<object> { 0.01f, 0.05f, 0.10f };
-
-        [UIValue("z-offset-step")]
-        public float NotesGridZOffsetStep
-        {
-            get => _notesGridZOffsetStep;
-            set
-            {
-                _notesGridZOffsetStep = value;
-                PluginConfig.Instance.NotesGridZOffsetStep = value;
-                PluginConfig.Instance.Changed();
-            }
-        }
-
         [UIValue("notes-grid-z-offset")]
         public float NotesGridZOffset
         {
@@ -236,14 +250,14 @@ namespace FaraAccField.Views
             }
         }
 
-        [UIValue("notes-grid-debug-log")]
-        public bool NotesGridDebugLog
+        [UIValue("debug-mode")]
+        public bool DebugMode
         {
-            get => _notesGridDebugLog;
+            get => _debugMode;
             set
             {
-                _notesGridDebugLog = value;
-                PluginConfig.Instance.NotesGridDebugLog = value;
+                _debugMode = value;
+                PluginConfig.Instance.DebugMode = value;
                 PluginConfig.Instance.Changed();
             }
         }
@@ -267,13 +281,14 @@ namespace FaraAccField.Views
             _axisLineWidth = PluginConfig.Instance.AxisLineWidth;
             _showAxisLine = PluginConfig.Instance.ShowAxisLine;
             _showArrowIndicator = PluginConfig.Instance.ShowArrowIndicator;
-            _preSwingGlow = PluginConfig.Instance.PreSwingGlowEnabled;
+            _arrowIndicatorWidth = PluginConfig.Instance.ArrowIndicatorWidth;
+            _arrowIndicatorHeight = PluginConfig.Instance.ArrowIndicatorHeight;
+            _glowCondition = PluginConfig.Instance.GlowCondition;
             _showNotesGrid = PluginConfig.Instance.ShowNotesGrid;
             _notesGridAlpha = PluginConfig.Instance.NotesGridAlpha;
             _linkRhythmMarkerZ = PluginConfig.Instance.LinkRhythmMarkerZOffset;
             _notesGridZOffset = PluginConfig.Instance.NotesGridZOffset;
-            _notesGridZOffsetStep = PluginConfig.Instance.NotesGridZOffsetStep;
-            _notesGridDebugLog = PluginConfig.Instance.NotesGridDebugLog;
+            _debugMode = PluginConfig.Instance.DebugMode;
         }
 
         private void RegisterSettingsMenu()

@@ -139,9 +139,9 @@ namespace FaraAccField.Services
 
                 _isInitialized = true;
 
-                if (PluginConfig.Instance.NotesGridDebugLog)
+                if (PluginConfig.Instance.DebugMode)
                 {
-                    Plugin.Log?.Info($"NoteGridService initialized: {TotalCubes} cubes, Z={_lastZOffset:F2}, shader={_shaderName}, alpha={alpha:F2}, Y=[{_rowPositions[0]:F3}, {_rowPositions[1]:F3}, {_rowPositions[2]:F3}]");
+                    Plugin.Log?.Info($"[Debug] NoteGridService initialized: {TotalCubes} cubes, Z={_lastZOffset:F2}, shader={_shaderName}, alpha={alpha:F2}, Y=[{_rowPositions[0]:F3}, {_rowPositions[1]:F3}, {_rowPositions[2]:F3}]");
                     for (int i = 0; i < TotalCubes; i++)
                     {
                         if (_cubes[i] != null)
@@ -149,7 +149,7 @@ namespace FaraAccField.Services
                             var cubePosition = _cubes[i].transform.position;
                             int row = i / Columns;
                             int col = i % Columns;
-                            Plugin.Log?.Info($"  Grid[row={row},col={col}] pos=({cubePosition.x:F3}, {cubePosition.y:F3}, {cubePosition.z:F3})");
+                            Plugin.Log?.Info($"[Debug] Grid[row={row},col={col}] pos=({cubePosition.x:F3}, {cubePosition.y:F3}, {cubePosition.z:F3})");
                         }
                     }
                 }
@@ -228,8 +228,8 @@ namespace FaraAccField.Services
             _rowCalibrated[lineLayer] = true;
             _rowPositions[lineLayer] = noteY;
 
-            if (PluginConfig.Instance.NotesGridDebugLog)
-                Plugin.Log?.Info($"NoteGrid Y runtime calibrated: layer {lineLayer} = {noteY:F3}");
+            if (PluginConfig.Instance.DebugMode)
+                Plugin.Log?.Info($"[Debug] NoteGrid Y runtime calibrated: layer {lineLayer} = {noteY:F3}");
 
             // Update cube positions for this row
             if (_cubes != null)

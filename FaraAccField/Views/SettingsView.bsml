@@ -18,19 +18,16 @@
                   apply-on-change="true"
                   hover-hint="~enabled-hint"/>
 
-  <toggle-setting text="~debug-log-text"
-                  value="notes-grid-debug-log"
-                  apply-on-change="true"
-                  hover-hint="~debug-log-hint"/>
-
   <horizontal bg='panel-top' pad='2'>
-    <text text="~preswing-header" font-size="4" color="#B060E0" align="Center"/>
+    <text text="~target-notes-header" font-size="4" color="#B060E0" align="Center"/>
   </horizontal>
 
-  <toggle-setting text="~notes-glow-text"
-                  value="pre-swing-glow"
-                  apply-on-change="true"
-                  hover-hint="~notes-glow-hint"/>
+  <dropdown-list-setting text="~condition-text"
+                         value="glow-condition"
+                         options="glow-condition-options"
+                         formatter="glow-condition-formatter"
+                         apply-on-change="true"
+                         hover-hint="~condition-hint"/>
 
   <horizontal bg='panel-top' pad='2'>
     <text text="~visual-header" font-size="4" color="#B060E0" align="Center"/>
@@ -78,10 +75,32 @@
                   apply-on-change="true"
                   hover-hint="~axis-width-hint"/>
 
+  <horizontal bg='panel-top' pad='2'>
+    <text text="~direction-header" font-size="4" color="#B060E0" align="Center"/>
+  </horizontal>
+
   <toggle-setting text="~show-arrow-text"
                   value="show-arrow-indicator"
                   apply-on-change="true"
                   hover-hint="~show-arrow-hint"/>
+
+  <slider-setting id="arrow-width-slider"
+                  text="~arrow-width-text"
+                  value="arrow-indicator-width"
+                  min="0.1"
+                  max="1"
+                  increment="0.01"
+                  apply-on-change="true"
+                  hover-hint="~arrow-width-hint"/>
+
+  <slider-setting id="arrow-height-slider"
+                  text="~arrow-height-text"
+                  value="arrow-indicator-height"
+                  min="0.1"
+                  max="1"
+                  increment="0.01"
+                  apply-on-change="true"
+                  hover-hint="~arrow-height-hint"/>
 
   <horizontal bg='panel-top' pad='2'>
     <text text="~grid-header" font-size="4" color="#B060E0" align="Center"/>
@@ -101,24 +120,27 @@
                   apply-on-change="true"
                   hover-hint="~grid-opacity-hint"/>
 
-  <toggle-setting text="~link-rhythm-text"
+  <toggle-setting id="link-rhythm-toggle"
+                  text="~link-rhythm-text"
                   value="link-rhythm-marker-z"
                   apply-on-change="true"
                   hover-hint="~link-rhythm-hint"/>
-
-  <dropdown-list-setting id="z-step-dropdown"
-                         text="~z-step-text"
-                         value="z-offset-step"
-                         options="z-offset-step-options"
-                         apply-on-change="true"
-                         hover-hint="~z-step-hint"/>
 
   <slider-setting id="z-offset-slider"
                   text="~z-offset-text"
                   value="notes-grid-z-offset"
                   min="0"
                   max="2"
-                  increment="~z-offset-step"
+                  increment="0.01"
                   apply-on-change="true"
                   hover-hint="~z-offset-hint"/>
+
+  <horizontal bg='panel-top' pad='2'>
+    <text text="~debug-header" font-size="4" color="#B060E0" align="Center"/>
+  </horizontal>
+
+  <toggle-setting text="~debug-mode-text"
+                  value="debug-mode"
+                  apply-on-change="true"
+                  hover-hint="~debug-mode-hint"/>
 </settings-container>

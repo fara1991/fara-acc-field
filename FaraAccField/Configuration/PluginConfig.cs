@@ -37,9 +37,9 @@ namespace FaraAccField.Configuration
         public virtual int CenterAccuracyTarget { get; set; } = 15;
 
         /// <summary>
-        /// Whether to glow notes when pre-swing threshold is reached
+        /// Glow condition for target notes: "None", "Next", or "PreSwing70"
         /// </summary>
-        public virtual bool PreSwingGlowEnabled { get; set; } = true;
+        public virtual string GlowCondition { get; set; } = GlowConditions.Next;
 
         /// <summary>
         /// Length of the X/Y/Z axis lines extending from the note center sphere (0.20 - 1.00)
@@ -60,6 +60,16 @@ namespace FaraAccField.Configuration
         /// Whether to show arrow direction indicators on notes
         /// </summary>
         public virtual bool ShowArrowIndicator { get; set; } = true;
+
+        /// <summary>
+        /// Width of the direction arrow indicator (0.10 - 1.00)
+        /// </summary>
+        public virtual float ArrowIndicatorWidth { get; set; } = 0.50f;
+
+        /// <summary>
+        /// Height of the direction arrow indicator (0.10 - 1.00)
+        /// </summary>
+        public virtual float ArrowIndicatorHeight { get; set; } = 0.50f;
 
         /// <summary>
         /// Whether to show the note grid guide (12 semi-transparent cubes at cut plane)
@@ -88,9 +98,9 @@ namespace FaraAccField.Configuration
         public virtual float NotesGridZOffsetStep { get; set; } = 0.10f;
 
         /// <summary>
-        /// Whether to log note grid and note position coordinates for debugging
+        /// Debug mode: logs grid coordinates, note spawn directions, and cut scores
         /// </summary>
-        public virtual bool NotesGridDebugLog { get; set; } = false;
+        public virtual bool DebugMode { get; set; } = false;
 
         /// <summary>
         /// Called when config changes
@@ -109,9 +119,24 @@ namespace FaraAccField.Configuration
             NotesGridAlpha = Math.Max(0.01f, Math.Min(0.3f, NotesGridAlpha));
             AxisLineLength = Math.Max(0.20f, Math.Min(1.00f, AxisLineLength));
             AxisLineWidth = Math.Max(0.01f, Math.Min(0.05f, AxisLineWidth));
+            ArrowIndicatorWidth = Math.Max(0.10f, Math.Min(1.00f, ArrowIndicatorWidth));
+            ArrowIndicatorHeight = Math.Max(0.10f, Math.Min(1.00f, ArrowIndicatorHeight));
             NotesGridZOffset = Math.Max(0.00f, Math.Min(2.00f, NotesGridZOffset));
             NotesGridZOffsetStep = Math.Max(0.01f, Math.Min(0.10f, NotesGridZOffsetStep));
+            if (GlowCondition != GlowConditions.None
+                && GlowCondition != GlowConditions.Next
+                && GlowCondition != GlowConditions.PreSwing70
+                && GlowCondition != GlowConditions.Always)
+                GlowCondition = GlowConditions.Next;
             Plugin.Log?.Info($"Config reloaded: Enabled={Enabled}");
         }
+    }
+
+    internal static class GlowConditions
+    {
+        public const string None = "None";
+        public const string Next = "Next";
+        public const string PreSwing70 = "PreSwing70";
+        public const string Always = "Always";
     }
 }

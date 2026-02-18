@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
+using FaraAccField.Configuration;
 
 namespace FaraAccField.Views
 {
@@ -26,14 +27,17 @@ namespace FaraAccField.Views
         [UIValue("common-header")]
         public string CommonHeader => L("Common", "共通");
 
-        [UIValue("preswing-header")]
-        public string PreswingHeader => L("Pre-Swing Feedback (70pts)", "プリスイング（70点）");
+        [UIValue("target-notes-header")]
+        public string TargetNotesHeader => L("Target Notes Assist", "対象ノーツ補助");
 
         [UIValue("visual-header")]
-        public string VisualHeader => L("Visual Feedback", "視覚フィードバック");
+        public string VisualHeader => L("Center-Point Assist", "中心点補助");
+
+        [UIValue("direction-header")]
+        public string DirectionHeader => L("Direction Assist", "矢印補助");
 
         [UIValue("grid-header")]
-        public string GridHeader => L("Notes Grid Guide", "ノーツグリッドガイド");
+        public string GridHeader => L("Cut Position Assist", "カット位置補助");
 
         [UIValue("language-hint")]
         public string LanguageHint => L("Select the display language for settings", "設定画面の表示言語を選択します");
@@ -43,19 +47,22 @@ namespace FaraAccField.Views
         [UIValue("enabled-hint")]
         public string EnabledHint => L("Enable or disable the acc field mod", "MOD全体の有効/無効を切り替えます");
 
-        [UIValue("debug-log-text")]
-        public string DebugLogText => L("Debug Position Log", "デバッグ座標ログ");
-        [UIValue("debug-log-hint")]
-        public string DebugLogHint => L(
-            "Log grid cube and notes X/Y/Z coordinates to file for debugging",
-            "グリッドキューブとノーツの座標をログに出力します（デバッグ用）");
+        [UIValue("debug-header")]
+        public string DebugHeader => L("Debug", "デバッグ");
 
-        [UIValue("notes-glow-text")]
-        public string NotesGlowText => L("Notes Glow", "ノーツ発光");
-        [UIValue("notes-glow-hint")]
-        public string NotesGlowHint => L(
-            "Glow the target notes when pre-swing (70pts) threshold is reached",
-            "プリスイングが100°に達すると対象ノーツが光ります");
+        [UIValue("debug-mode-text")]
+        public string DebugModeText => L("Debug Mode", "デバッグモード");
+        [UIValue("debug-mode-hint")]
+        public string DebugModeHint => L(
+            "Log grid coordinates, note spawn directions, and cut scores to file for debugging",
+            "グリッド座標、ノーツの出現方向、カットスコアをログに出力します（デバッグ用）");
+
+        [UIValue("condition-text")]
+        public string ConditionText => L("Condition", "条件");
+        [UIValue("condition-hint")]
+        public string ConditionHint => L(
+            "When to glow target notes: None=off, Next=always glow next notes, Pre-Swing 70pts=glow when swing angle reaches 100°",
+            "ノーツを光らせる条件: None=オフ、Next=常に次のノーツを光らせる、Pre-Swing 70pts=振りかぶり100°達成時に光らせる");
 
         [UIValue("show-trajectory-text")]
         public string ShowTrajectoryText => L("Show Trajectory Line", "軌道線を表示");
@@ -100,21 +107,35 @@ namespace FaraAccField.Views
             "ノーツ位置にX/Y/Z軸線を表示します");
 
         [UIValue("show-arrow-text")]
-        public string ShowArrowText => L("Show Arrow Indicator", "矢印インジケーターを表示");
+        public string ShowArrowText => L("Show Direction", "方向を表示");
         [UIValue("show-arrow-hint")]
         public string ShowArrowHint => L(
             "Show arrow indicators on notes pointing in the cut direction",
             "ノーツの切る方向を示す矢印インジケーターを表示します");
 
+        [UIValue("arrow-width-text")]
+        public string ArrowWidthText => L("Direction Width", "方向表示の横幅");
+        [UIValue("arrow-width-hint")]
+        public string ArrowWidthHint => L(
+            "Width of the direction arrow indicator (0.1=narrow, 1.0=wide)",
+            "方向矢印の横幅（0.1=狭い、1.0=広い）");
+
+        [UIValue("arrow-height-text")]
+        public string ArrowHeightText => L("Direction Height", "方向表示の縦幅");
+        [UIValue("arrow-height-hint")]
+        public string ArrowHeightHint => L(
+            "Height of the direction arrow indicator (0.1=short, 1.0=tall)",
+            "方向矢印の縦幅（0.1=短い、1.0=長い）");
+
         [UIValue("show-grid-text")]
-        public string ShowGridText => L("Show Notes Grid", "ノーツグリッドを表示");
+        public string ShowGridText => L("Show Cut Position", "カット位置を表示");
         [UIValue("show-grid-hint")]
         public string ShowGridHint => L(
             "Show semi-transparent cubes at each of the 12 notes positions at cut depth",
             "12個の半透明キューブをノーツ位置に表示します");
 
         [UIValue("grid-opacity-text")]
-        public string GridOpacityText => L("Notes Grid Opacity", "グリッド透明度");
+        public string GridOpacityText => L("Opacity", "透明度");
         [UIValue("grid-opacity-hint")]
         public string GridOpacityHint => L(
             "Opacity of grid cubes (0.01=barely visible, 0.3=semi-transparent)",
@@ -127,11 +148,6 @@ namespace FaraAccField.Views
             "When FaraRhythmMarker mod is installed, syncs cube and marker Z positions. Otherwise uses manual Z Offset below",
             "FaraRhythmMarkerのModを導入している場合、キューブとマーカー表示のZ位置を連動させます");
 
-        [UIValue("z-step-text")]
-        public string ZStepText => L("Z Offset Step", "Zオフセット刻み幅");
-        [UIValue("z-step-hint")]
-        public string ZStepHint => L("Step size for the Z Offset slider", "Zオフセットスライダーの刻み幅");
-
         [UIValue("z-offset-text")]
         public string ZOffsetText => L("Notes Grid Z Offset", "グリッドZ位置");
         [UIValue("z-offset-hint")]
@@ -142,16 +158,18 @@ namespace FaraAccField.Views
         private void NotifyAllTextChanged()
         {
             NotifyPropertyChanged(nameof(CommonHeader));
-            NotifyPropertyChanged(nameof(PreswingHeader));
+            NotifyPropertyChanged(nameof(TargetNotesHeader));
             NotifyPropertyChanged(nameof(VisualHeader));
+            NotifyPropertyChanged(nameof(DirectionHeader));
             NotifyPropertyChanged(nameof(GridHeader));
             NotifyPropertyChanged(nameof(LanguageHint));
             NotifyPropertyChanged(nameof(EnabledText));
             NotifyPropertyChanged(nameof(EnabledHint));
-            NotifyPropertyChanged(nameof(DebugLogText));
-            NotifyPropertyChanged(nameof(DebugLogHint));
-            NotifyPropertyChanged(nameof(NotesGlowText));
-            NotifyPropertyChanged(nameof(NotesGlowHint));
+            NotifyPropertyChanged(nameof(DebugHeader));
+            NotifyPropertyChanged(nameof(DebugModeText));
+            NotifyPropertyChanged(nameof(DebugModeHint));
+            NotifyPropertyChanged(nameof(ConditionText));
+            NotifyPropertyChanged(nameof(ConditionHint));
             NotifyPropertyChanged(nameof(ShowTrajectoryText));
             NotifyPropertyChanged(nameof(ShowTrajectoryHint));
             NotifyPropertyChanged(nameof(ShowSphereText));
@@ -166,14 +184,16 @@ namespace FaraAccField.Views
             NotifyPropertyChanged(nameof(ShowAxisHint));
             NotifyPropertyChanged(nameof(ShowArrowText));
             NotifyPropertyChanged(nameof(ShowArrowHint));
+            NotifyPropertyChanged(nameof(ArrowWidthText));
+            NotifyPropertyChanged(nameof(ArrowWidthHint));
+            NotifyPropertyChanged(nameof(ArrowHeightText));
+            NotifyPropertyChanged(nameof(ArrowHeightHint));
             NotifyPropertyChanged(nameof(ShowGridText));
             NotifyPropertyChanged(nameof(ShowGridHint));
             NotifyPropertyChanged(nameof(GridOpacityText));
             NotifyPropertyChanged(nameof(GridOpacityHint));
             NotifyPropertyChanged(nameof(LinkRhythmText));
             NotifyPropertyChanged(nameof(LinkRhythmHint));
-            NotifyPropertyChanged(nameof(ZStepText));
-            NotifyPropertyChanged(nameof(ZStepHint));
             NotifyPropertyChanged(nameof(ZOffsetText));
             NotifyPropertyChanged(nameof(ZOffsetHint));
         }
@@ -184,6 +204,22 @@ namespace FaraAccField.Views
 
         [UIValue("language-options")]
         public List<object> LanguageOptions => _manager?.LanguageOptions ?? new List<object> { "English", "Japanese" };
+
+        [UIValue("glow-condition-options")]
+        public List<object> GlowConditionOptions => _manager?.GlowConditionOptions ?? new List<object> { GlowConditions.None, GlowConditions.Next, GlowConditions.PreSwing70, GlowConditions.Always };
+
+        [UIAction("glow-condition-formatter")]
+        private string FormatGlowCondition(string value)
+        {
+            return value switch
+            {
+                GlowConditions.None => L("None", "なし"),
+                GlowConditions.Next => L("Next", "次のノーツ"),
+                GlowConditions.PreSwing70 => L("Pre-Swing 70pts", "プリスイング 70pts"),
+                GlowConditions.Always => L("Always", "常時"),
+                _ => value
+            };
+        }
 
         [UIValue("language")]
         public string Language
@@ -286,17 +322,40 @@ namespace FaraAccField.Views
             {
                 if (_manager != null)
                     _manager.ShowArrowIndicator = value;
+                NotifyInteractableChanged();
             }
         }
 
-        [UIValue("pre-swing-glow")]
-        public bool PreSwingGlow
+        [UIValue("arrow-indicator-width")]
+        public float ArrowIndicatorWidth
         {
-            get => _manager?.PreSwingGlow ?? true;
+            get => _manager?.ArrowIndicatorWidth ?? 0.50f;
             set
             {
                 if (_manager != null)
-                    _manager.PreSwingGlow = value;
+                    _manager.ArrowIndicatorWidth = value;
+            }
+        }
+
+        [UIValue("arrow-indicator-height")]
+        public float ArrowIndicatorHeight
+        {
+            get => _manager?.ArrowIndicatorHeight ?? 0.50f;
+            set
+            {
+                if (_manager != null)
+                    _manager.ArrowIndicatorHeight = value;
+            }
+        }
+
+        [UIValue("glow-condition")]
+        public string GlowCondition
+        {
+            get => _manager?.GlowCondition ?? GlowConditions.Next;
+            set
+            {
+                if (_manager != null)
+                    _manager.GlowCondition = value;
             }
         }
 
@@ -345,14 +404,20 @@ namespace FaraAccField.Views
         [UIObject("axis-width-slider")]
         private UnityEngine.GameObject? _axisWidthSliderObj;
 
+        [UIObject("arrow-width-slider")]
+        private UnityEngine.GameObject? _arrowWidthSliderObj;
+
+        [UIObject("arrow-height-slider")]
+        private UnityEngine.GameObject? _arrowHeightSliderObj;
+
         [UIObject("grid-opacity-slider")]
         private UnityEngine.GameObject? _gridOpacitySliderObj;
 
-        [UIObject("z-step-dropdown")]
-        private UnityEngine.GameObject? _zStepDropdownObj;
-
         [UIObject("z-offset-slider")]
         private UnityEngine.GameObject? _zOffsetSliderObj;
+
+        [UIObject("link-rhythm-toggle")]
+        private UnityEngine.GameObject? _linkRhythmToggleObj;
 #pragma warning restore CS0649
 
         [UIAction("#post-parse")]
@@ -375,11 +440,15 @@ namespace FaraAccField.Views
             SetChildrenInteractable(_axisLengthSliderObj, axisOn);
             SetChildrenInteractable(_axisWidthSliderObj, axisOn);
 
+            bool arrowOn = _manager?.ShowArrowIndicator ?? true;
+            SetChildrenInteractable(_arrowWidthSliderObj, arrowOn);
+            SetChildrenInteractable(_arrowHeightSliderObj, arrowOn);
+
             bool gridOn = _manager?.ShowNotesGrid ?? true;
             SetChildrenInteractable(_gridOpacitySliderObj, gridOn);
+            SetChildrenInteractable(_linkRhythmToggleObj, gridOn);
 
-            bool zOffsetOn = _manager?.ZOffsetInteractable ?? false;
-            SetChildrenInteractable(_zStepDropdownObj, zOffsetOn);
+            bool zOffsetOn = gridOn && (_manager?.ZOffsetInteractable ?? false);
             SetChildrenInteractable(_zOffsetSliderObj, zOffsetOn);
         }
 
@@ -388,20 +457,9 @@ namespace FaraAccField.Views
             if (obj == null) return;
             foreach (var sel in obj.GetComponentsInChildren<UnityEngine.UI.Selectable>(true))
                 sel.interactable = interactable;
-        }
-
-        [UIValue("z-offset-step-options")]
-        public List<object> ZOffsetStepOptions => _manager?.ZOffsetStepOptions ?? new List<object> { 0.01f, 0.05f, 0.10f };
-
-        [UIValue("z-offset-step")]
-        public float NotesGridZOffsetStep
-        {
-            get => _manager?.NotesGridZOffsetStep ?? 0.10f;
-            set
-            {
-                if (_manager != null)
-                    _manager.NotesGridZOffsetStep = value;
-            }
+            float alpha = interactable ? 1f : 0.5f;
+            foreach (var text in obj.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true))
+                text.alpha = alpha;
         }
 
         [UIValue("notes-grid-z-offset")]
@@ -415,14 +473,14 @@ namespace FaraAccField.Views
             }
         }
 
-        [UIValue("notes-grid-debug-log")]
-        public bool NotesGridDebugLog
+        [UIValue("debug-mode")]
+        public bool DebugMode
         {
-            get => _manager?.NotesGridDebugLog ?? false;
+            get => _manager?.DebugMode ?? false;
             set
             {
                 if (_manager != null)
-                    _manager.NotesGridDebugLog = value;
+                    _manager.DebugMode = value;
             }
         }
 

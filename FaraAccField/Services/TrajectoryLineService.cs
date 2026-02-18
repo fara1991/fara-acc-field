@@ -12,8 +12,6 @@ namespace FaraAccField.Services
     /// </summary>
     internal class TrajectoryLineService : IDisposable
     {
-        private const float ArrowIndicatorScale = 0.40f;
-
         // Per-saber trajectory line (single line from saber to nearest note)
         private TrajectoryLine? _leftLine;
         private TrajectoryLine? _rightLine;
@@ -311,9 +309,11 @@ namespace FaraAccField.Services
                             ? arrowDirections[i] : Vector3.zero;
                         if (arrowDir != Vector3.zero)
                         {
-                            float arrowOffset = sphereRadius + 0.333f * ArrowIndicatorScale;
+                            float arrowWidth = config.ArrowIndicatorWidth;
+                            float arrowHeight = config.ArrowIndicatorHeight;
+                            float arrowOffset = VisualHelper.CalculateArrowOffset(sphereRadius, arrowHeight);
                             sd.ArrowObj.transform.position = pos + arrowDir * arrowOffset;
-                            sd.ArrowObj.transform.localScale = Vector3.one * ArrowIndicatorScale;
+                            sd.ArrowObj.transform.localScale = new Vector3(arrowWidth, arrowHeight, arrowWidth);
                             sd.ArrowObj.transform.rotation = Quaternion.FromToRotation(Vector3.up, arrowDir);
                             if (sd.ArrowRenderer != null)
                                 sd.ArrowRenderer.enabled = true;
@@ -416,8 +416,13 @@ namespace FaraAccField.Services
                 if (sd == null)
                     continue;
 
-                if (sd.SphereRenderer?.material != null)
-                    UnityEngine.Object.Destroy(sd.SphereRenderer.material);
+                // Use Unity's == operator (not ?.) to detect destroyed objects
+                if (sd.SphereRenderer != null)
+                {
+                    var mat = sd.SphereRenderer.sharedMaterial;
+                    if (mat != null)
+                        UnityEngine.Object.Destroy(mat);
+                }
                 if (sd.Sphere != null)
                     UnityEngine.Object.Destroy(sd.Sphere);
                 if (sd.AxisXObj != null)
@@ -426,12 +431,14 @@ namespace FaraAccField.Services
                     UnityEngine.Object.Destroy(sd.AxisYObj);
                 if (sd.AxisZObj != null)
                     UnityEngine.Object.Destroy(sd.AxisZObj);
-                if (sd.ArrowObj != null)
+                if (sd.ArrowRenderer != null)
                 {
-                    if (sd.ArrowRenderer?.material != null)
-                        UnityEngine.Object.Destroy(sd.ArrowRenderer.material);
-                    UnityEngine.Object.Destroy(sd.ArrowObj);
+                    var mat = sd.ArrowRenderer.sharedMaterial;
+                    if (mat != null)
+                        UnityEngine.Object.Destroy(mat);
                 }
+                if (sd.ArrowObj != null)
+                    UnityEngine.Object.Destroy(sd.ArrowObj);
             }
             spheres.Clear();
         }
