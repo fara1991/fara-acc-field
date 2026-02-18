@@ -7,7 +7,6 @@
         <OutputType>Library</OutputType>
         <AssemblyName>FaraAccField</AssemblyName>
         <RootNamespace>FaraAccField</RootNamespace>
-        <Version>1.0.0</Version>
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     </PropertyGroup>
@@ -163,6 +162,24 @@
         </EmbeddedResource>
     </ItemGroup>
 
+    <!-- Read version from manifest.json -->
+    <Target Name="ReadManifestVersion" BeforeTargets="BeforeBuild">
+        <PropertyGroup>
+            <_ManifestFile Condition="Exists('manifest.$(BSVersion).json')">manifest.$(BSVersion).json</_ManifestFile>
+            <_ManifestFile Condition="'$(_ManifestFile)' == ''">manifest.json</_ManifestFile>
+        </PropertyGroup>
+        <ReadLinesFromFile File="$(_ManifestFile)">
+            <Output TaskParameter="Lines" ItemName="_ManifestLines"/>
+        </ReadLinesFromFile>
+        <PropertyGroup>
+            <_ManifestContent>@(_ManifestLines)</_ManifestContent>
+            <_ManifestVersion>$([System.Text.RegularExpressions.Regex]::Match($(_ManifestContent), '"version"\s*:\s*"([^"]+)"').Groups[1].Value)</_ManifestVersion>
+            <Version Condition="'$(_ManifestVersion)' != ''">$(_ManifestVersion)</Version>
+        </PropertyGroup>
+        <Error Condition="'$(_ManifestVersion)' == ''"
+               Text="Failed to read version from $(_ManifestFile). Ensure manifest.json contains a valid &quot;version&quot; field."/>
+    </Target>
+
     <!-- Copy to Plugins folder after build -->
     <Target Name="CopyToPlugins" AfterTargets="Build">
         <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(BeatSaberDir)\Plugins"/>
@@ -185,13 +202,13 @@
         </PropertyGroup>
 
         <RemoveDir Directories="$(_StagingDir)" />
-        <MakeDir Directories="$(_StagingDir)\1.29.1" />
-        <MakeDir Directories="$(_StagingDir)\1.40.8" />
+        <MakeDir Directories="$(_StagingDir)\1.29.1\Plugins" />
+        <MakeDir Directories="$(_StagingDir)\1.40.8\Plugins" />
 
         <Copy SourceFiles="$(BeatSaberDir_1_29_1)\Plugins\$(AssemblyName).dll"
-              DestinationFolder="$(_StagingDir)\1.29.1" />
+              DestinationFolder="$(_StagingDir)\1.29.1\Plugins" />
         <Copy SourceFiles="$(BeatSaberDir_1_40_8)\Plugins\$(AssemblyName).dll"
-              DestinationFolder="$(_StagingDir)\1.40.8" />
+              DestinationFolder="$(_StagingDir)\1.40.8\Plugins" />
         <Copy SourceFiles="$(ProjectDir)..\SETTINGS_GUIDE.md"
               DestinationFolder="$(_StagingDir)" />
 
