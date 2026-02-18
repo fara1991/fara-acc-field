@@ -172,6 +172,7 @@ namespace FaraAccField.Controllers
                 _debugCutInfo[note.noteData] = ($"{color} dir={note.noteData.cutDirection}", hadGlow);
             }
 
+            if (note == null) return;
             _noteTrackingModel.OnNoteCut(note);
             _glowTriggered.Remove(note);
             _noteGlowService.RemoveGlow(note);

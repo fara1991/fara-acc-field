@@ -57,11 +57,24 @@ dotnet build
 
 ```powershell
 # 1.29.1 のみ
-dotnet build /p:BSVersion=1.29.1 /p:SecondBuild=true
+dotnet build -p:BSVersion=1.29.1 -p:SecondBuild=true
 
 # 1.40.8 のみ
-dotnet build /p:BSVersion=1.40.8 /p:SecondBuild=true
+dotnet build -p:BSVersion=1.40.8 -p:SecondBuild=true
 ```
+
+リリース用ZIPを作成する場合:
+
+```powershell
+dotnet build -p:CreateRelease=true
+```
+
+`release/FaraAccField_vx.x.x.zip` が生成されます。ZIP には両バージョンの DLL と SETTINGS_GUIDE.md が含まれます。
+
+### バージョン管理
+
+DLLのバージョンは `manifest.json` の `"version"` フィールドから自動的に読み取られます。
+バージョンを変更する場合は `manifest.json`（および `manifest.*.json`）を更新してください。
 
 ## 設定方法
 

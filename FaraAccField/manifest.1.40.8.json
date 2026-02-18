@@ -3,7 +3,7 @@
   "id": "FaraAccField",
   "name": "FaraAccField",
   "author": "Fara",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Provides real-time feedback for achieving 115 points on notes. Vibrates when pre-swing (70pts) and follow-through (30pts) thresholds are met.",
   "gameVersion": "1.40.8",
   "dependsOn": {
