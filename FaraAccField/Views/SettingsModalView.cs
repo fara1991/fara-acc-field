@@ -283,7 +283,7 @@ namespace FaraAccField.Views
         [UIValue("axis-line-length")]
         public float AxisLineLength
         {
-            get => _manager?.AxisLineLength ?? 0.40f;
+            get => _manager?.AxisLineLength ?? 0.50f;
             set
             {
                 if (_manager != null)
