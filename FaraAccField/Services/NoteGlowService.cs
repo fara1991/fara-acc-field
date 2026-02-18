@@ -5,7 +5,7 @@ using UnityEngine;
 namespace FaraAccField.Services
 {
     /// <summary>
-    /// Manages visual glow effects on notes when pre-swing threshold is reached.
+    /// Manages visual glow effects on notes when the configured glow condition is met.
     /// Creates a semi-transparent cube slightly larger than the note, parented to it.
     /// </summary>
     internal class NoteGlowService : IDisposable

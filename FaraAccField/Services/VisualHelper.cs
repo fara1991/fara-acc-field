@@ -15,6 +15,11 @@ namespace FaraAccField.Services
             return kMaxCenterDistance * (15.5f - centerTarget) / 15f;
         }
 
+        public static float CalculateArrowOffset(float sphereRadius, float arrowHeight)
+        {
+            return sphereRadius + 0.333f * arrowHeight;
+        }
+
         public static Mesh CreateTriangleMesh()
         {
             var mesh = new Mesh();

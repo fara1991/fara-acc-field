@@ -9,7 +9,7 @@ using Zenject;
 namespace FaraAccField.Controllers
 {
     /// <summary>
-    /// Main controller that coordinates pre-swing detection,
+    /// Main controller that coordinates target note glow,
     /// trajectory line display, and note grid highlighting during gameplay.
     /// </summary>
     internal class AccFieldController : IInitializable, ITickable, IDisposable
@@ -26,7 +26,7 @@ namespace FaraAccField.Controllers
         private readonly SaberState _rightSaberState = new();
 
         // Track which notes have already triggered glow
-        private readonly HashSet<NoteController> _preSwingTriggered = new();
+        private readonly HashSet<NoteController> _glowTriggered = new();
 
         // Set true only after successful Initialize(); Tick() is skipped when false
         private bool _initialized;
@@ -135,7 +135,7 @@ namespace FaraAccField.Controllers
         private void OnNoteCut(NoteController note, in NoteCutInfo info)
         {
             _noteTrackingModel.OnNoteCut(note);
-            _preSwingTriggered.Remove(note);
+            _glowTriggered.Remove(note);
             _noteGlowService.RemoveGlow(note);
             ResetNoteGridHighlight(note);
         }
@@ -143,7 +143,7 @@ namespace FaraAccField.Controllers
         private void OnNoteMissed(NoteController note)
         {
             _noteTrackingModel.OnNoteMissed(note);
-            _preSwingTriggered.Remove(note);
+            _glowTriggered.Remove(note);
             _noteGlowService.RemoveGlow(note);
             ResetNoteGridHighlight(note);
         }
@@ -169,7 +169,7 @@ namespace FaraAccField.Controllers
 
             // Process target notes glow for both sabers
             string glowCondition = config.GlowCondition;
-            if (glowCondition != "None")
+            if (glowCondition != GlowConditions.None)
             {
                 ProcessTargetNotes(SaberType.SaberA, _leftSaberState, glowCondition);
                 ProcessTargetNotes(SaberType.SaberB, _rightSaberState, glowCondition);
@@ -216,23 +216,23 @@ namespace FaraAccField.Controllers
             if (nearestNotes.Count == 0)
                 return;
 
-            if (glowCondition == "Next")
+            if (glowCondition == GlowConditions.Next)
             {
                 foreach (var note in nearestNotes)
                 {
-                    if (!_preSwingTriggered.Contains(note))
+                    if (!_glowTriggered.Contains(note))
                     {
                         _noteGlowService.ApplyGlow(note);
-                        _preSwingTriggered.Add(note);
+                        _glowTriggered.Add(note);
                     }
                 }
             }
-            else if (glowCondition == "PreSwing70")
+            else if (glowCondition == GlowConditions.PreSwing70)
             {
                 bool allTriggered = true;
                 foreach (var note in nearestNotes)
                 {
-                    if (!_preSwingTriggered.Contains(note))
+                    if (!_glowTriggered.Contains(note))
                     {
                         allTriggered = false;
                         break;
@@ -253,10 +253,10 @@ namespace FaraAccField.Controllers
                 {
                     foreach (var note in nearestNotes)
                     {
-                        if (!_preSwingTriggered.Contains(note))
+                        if (!_glowTriggered.Contains(note))
                         {
                             _noteGlowService.ApplyGlow(note);
-                            _preSwingTriggered.Add(note);
+                            _glowTriggered.Add(note);
                         }
                     }
                 }
@@ -434,7 +434,7 @@ namespace FaraAccField.Controllers
 
             // Clear tracking data
             _noteTrackingModel.Clear();
-            _preSwingTriggered.Clear();
+            _glowTriggered.Clear();
             _gridHighlightedNotes.Clear();
             _gridYInitialized = false;
             _initialized = false;

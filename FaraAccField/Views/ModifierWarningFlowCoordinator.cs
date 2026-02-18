@@ -1,5 +1,6 @@
 using System;
 using BeatSaberMarkupLanguage;
+using FaraAccField.Patches;
 
 namespace FaraAccField.Views
 {
@@ -36,6 +37,13 @@ namespace FaraAccField.Views
             {
                 Plugin.Log?.Error($"ModifierWarningFlowCoordinator.DidActivate error: {ex}");
             }
+        }
+
+        protected override void DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
+        {
+            base.DidDeactivate(removedFromHierarchy, screenSystemDisabling);
+            if (removedFromHierarchy)
+                ModifierWarningPatch.ClearStoredState();
         }
 
         protected override void BackButtonWasPressed(HMUI.ViewController topViewController)

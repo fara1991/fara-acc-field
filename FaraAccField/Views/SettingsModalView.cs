@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
+using FaraAccField.Configuration;
 
 namespace FaraAccField.Views
 {
@@ -26,17 +27,17 @@ namespace FaraAccField.Views
         [UIValue("common-header")]
         public string CommonHeader => L("Common", "共通");
 
-        [UIValue("preswing-header")]
-        public string PreswingHeader => L("Target Notes Assist", "ターゲットノーツアシスト");
+        [UIValue("target-notes-header")]
+        public string TargetNotesHeader => L("Target Notes Assist", "対象ノーツ補助");
 
         [UIValue("visual-header")]
-        public string VisualHeader => L("Center-Point Assist", "センターポイントアシスト");
+        public string VisualHeader => L("Center-Point Assist", "中心点補助");
 
         [UIValue("direction-header")]
-        public string DirectionHeader => L("Direction Assist", "ディレクションアシスト");
+        public string DirectionHeader => L("Direction Assist", "矢印補助");
 
         [UIValue("grid-header")]
-        public string GridHeader => L("Cut Position Assist", "カットポジションアシスト");
+        public string GridHeader => L("Cut Position Assist", "カット位置補助");
 
         [UIValue("language-hint")]
         public string LanguageHint => L("Select the display language for settings", "設定画面の表示言語を選択します");
@@ -154,7 +155,7 @@ namespace FaraAccField.Views
         private void NotifyAllTextChanged()
         {
             NotifyPropertyChanged(nameof(CommonHeader));
-            NotifyPropertyChanged(nameof(PreswingHeader));
+            NotifyPropertyChanged(nameof(TargetNotesHeader));
             NotifyPropertyChanged(nameof(VisualHeader));
             NotifyPropertyChanged(nameof(DirectionHeader));
             NotifyPropertyChanged(nameof(GridHeader));
@@ -201,16 +202,16 @@ namespace FaraAccField.Views
         public List<object> LanguageOptions => _manager?.LanguageOptions ?? new List<object> { "English", "Japanese" };
 
         [UIValue("glow-condition-options")]
-        public List<object> GlowConditionOptions => _manager?.GlowConditionOptions ?? new List<object> { "None", "Next", "PreSwing70" };
+        public List<object> GlowConditionOptions => _manager?.GlowConditionOptions ?? new List<object> { GlowConditions.None, GlowConditions.Next, GlowConditions.PreSwing70 };
 
         [UIAction("glow-condition-formatter")]
         private string FormatGlowCondition(string value)
         {
             return value switch
             {
-                "None" => L("None", "なし"),
-                "Next" => L("Next", "次のノーツ"),
-                "PreSwing70" => L("Pre-Swing 70pts", "プリスイング 70pts"),
+                GlowConditions.None => L("None", "なし"),
+                GlowConditions.Next => L("Next", "次のノーツ"),
+                GlowConditions.PreSwing70 => L("Pre-Swing 70pts", "プリスイング 70pts"),
                 _ => value
             };
         }
@@ -345,7 +346,7 @@ namespace FaraAccField.Views
         [UIValue("glow-condition")]
         public string GlowCondition
         {
-            get => _manager?.GlowCondition ?? "Next";
+            get => _manager?.GlowCondition ?? GlowConditions.Next;
             set
             {
                 if (_manager != null)

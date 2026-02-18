@@ -179,7 +179,7 @@ namespace FaraAccField.Views
         }
 
         [UIValue("glow-condition-options")]
-        public List<object> GlowConditionOptions => new List<object> { "None", "Next", "PreSwing70" };
+        public List<object> GlowConditionOptions => new List<object> { GlowConditions.None, GlowConditions.Next, GlowConditions.PreSwing70 };
 
         [UIValue("glow-condition")]
         public string GlowCondition

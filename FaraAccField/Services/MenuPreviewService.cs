@@ -37,9 +37,6 @@ namespace FaraAccField.Services
         private const float SaberLength = 0.8f;
         private const float MinSwingAngularSpeed = 200f;
 
-        // Arrow indicator size is now controlled by config:
-        // PluginConfig.ArrowIndicatorWidth / ArrowIndicatorHeight
-
         private static readonly Vector3[] ArrowDirections =
         {
             Vector3.up,
@@ -197,7 +194,7 @@ namespace FaraAccField.Services
 
                 _triangleMesh = VisualHelper.CreateTriangleMesh();
 
-                // Glow materials for pre-swing preview
+                // Glow materials for note glow preview
                 Shader? glowShader = Shader.Find("Particles/Additive")
                     ?? Shader.Find("Sprites/Default")
                     ?? Shader.Find("UI/Default");
@@ -505,14 +502,14 @@ namespace FaraAccField.Services
             }
 
             string glowCondition = config.GlowCondition;
-            if (glowCondition == "Next")
+            if (glowCondition == GlowConditions.Next)
             {
                 if (nearestLeft != null && !nearestLeft.HasGlow)
                     ApplyPreviewGlow(nearestLeft);
                 if (nearestRight != null && !nearestRight.HasGlow)
                     ApplyPreviewGlow(nearestRight);
             }
-            else if (glowCondition == "PreSwing70")
+            else if (glowCondition == GlowConditions.PreSwing70)
             {
                 ApplyGlowIfPreSwing(nearestLeft, _menuLeftSaber);
                 ApplyGlowIfPreSwing(nearestRight, _menuRightSaber);
@@ -562,7 +559,7 @@ namespace FaraAccField.Services
                 {
                     float arrowWidth = config.ArrowIndicatorWidth;
                     float arrowHeight = config.ArrowIndicatorHeight;
-                    float arrowOffset = sphereRadius + 0.333f * arrowHeight;
+                    float arrowOffset = VisualHelper.CalculateArrowOffset(sphereRadius, arrowHeight);
                     note.ArrowIndicator.transform.localPosition = note.ArrowDirection * arrowOffset;
                     note.ArrowIndicator.transform.localScale = new Vector3(arrowWidth, arrowHeight, arrowWidth);
                 }
@@ -762,7 +759,7 @@ namespace FaraAccField.Services
 
             float arrowWidth = PluginConfig.Instance.ArrowIndicatorWidth;
             float arrowHeight = PluginConfig.Instance.ArrowIndicatorHeight;
-            float arrowOffset = sphereRadius + 0.333f * arrowHeight;
+            float arrowOffset = VisualHelper.CalculateArrowOffset(sphereRadius, arrowHeight);
             arrow.transform.localPosition = arrowDir * arrowOffset;
             arrow.transform.localScale = new Vector3(arrowWidth, arrowHeight, arrowWidth);
 

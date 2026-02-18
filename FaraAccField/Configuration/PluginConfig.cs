@@ -39,7 +39,7 @@ namespace FaraAccField.Configuration
         /// <summary>
         /// Glow condition for target notes: "None", "Next", or "PreSwing70"
         /// </summary>
-        public virtual string GlowCondition { get; set; } = "Next";
+        public virtual string GlowCondition { get; set; } = GlowConditions.Next;
 
         /// <summary>
         /// Length of the X/Y/Z axis lines extending from the note center sphere (0.20 - 1.00)
@@ -123,9 +123,18 @@ namespace FaraAccField.Configuration
             ArrowIndicatorHeight = Math.Max(0.10f, Math.Min(1.00f, ArrowIndicatorHeight));
             NotesGridZOffset = Math.Max(0.00f, Math.Min(2.00f, NotesGridZOffset));
             NotesGridZOffsetStep = Math.Max(0.01f, Math.Min(0.10f, NotesGridZOffsetStep));
-            if (GlowCondition != "None" && GlowCondition != "Next" && GlowCondition != "PreSwing70")
-                GlowCondition = "Next";
+            if (GlowCondition != GlowConditions.None
+                && GlowCondition != GlowConditions.Next
+                && GlowCondition != GlowConditions.PreSwing70)
+                GlowCondition = GlowConditions.Next;
             Plugin.Log?.Info($"Config reloaded: Enabled={Enabled}");
         }
+    }
+
+    internal static class GlowConditions
+    {
+        public const string None = "None";
+        public const string Next = "Next";
+        public const string PreSwing70 = "PreSwing70";
     }
 }

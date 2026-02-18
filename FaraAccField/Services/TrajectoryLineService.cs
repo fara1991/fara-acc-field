@@ -12,9 +12,6 @@ namespace FaraAccField.Services
     /// </summary>
     internal class TrajectoryLineService : IDisposable
     {
-        // Arrow indicator size is now controlled by config:
-        // PluginConfig.ArrowIndicatorWidth / ArrowIndicatorHeight
-
         // Per-saber trajectory line (single line from saber to nearest note)
         private TrajectoryLine? _leftLine;
         private TrajectoryLine? _rightLine;
@@ -314,7 +311,7 @@ namespace FaraAccField.Services
                         {
                             float arrowWidth = config.ArrowIndicatorWidth;
                             float arrowHeight = config.ArrowIndicatorHeight;
-                            float arrowOffset = sphereRadius + 0.333f * arrowHeight;
+                            float arrowOffset = VisualHelper.CalculateArrowOffset(sphereRadius, arrowHeight);
                             sd.ArrowObj.transform.position = pos + arrowDir * arrowOffset;
                             sd.ArrowObj.transform.localScale = new Vector3(arrowWidth, arrowHeight, arrowWidth);
                             sd.ArrowObj.transform.rotation = Quaternion.FromToRotation(Vector3.up, arrowDir);

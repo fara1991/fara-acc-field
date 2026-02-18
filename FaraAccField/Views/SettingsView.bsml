@@ -24,7 +24,7 @@
                   hover-hint="~debug-log-hint"/>
 
   <horizontal bg='panel-top' pad='2'>
-    <text text="~preswing-header" font-size="4" color="#B060E0" align="Center"/>
+    <text text="~target-notes-header" font-size="4" color="#B060E0" align="Center"/>
   </horizontal>
 
   <dropdown-list-setting text="~condition-text"

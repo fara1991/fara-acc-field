@@ -180,11 +180,16 @@ namespace FaraAccField.Patches
 
         internal static void OnCancel()
         {
+            ClearStoredState();
+            Plugin.Log?.Info("User cancelled level start due to modifier conflict");
+        }
+
+        internal static void ClearStoredState()
+        {
             _warningShown = false;
             _storedInstance = null;
             _storedMethod = null;
             _storedArgs = null;
-            Plugin.Log?.Info("User cancelled level start due to modifier conflict");
         }
 
         private static void ReplayLevelStart()
@@ -206,8 +211,11 @@ namespace FaraAccField.Patches
             }
             catch (Exception ex)
             {
-                _bypassing = false;
                 Plugin.Log?.Error($"Failed to replay level start: {ex}");
+            }
+            finally
+            {
+                _bypassing = false;
             }
         }
     }
