@@ -91,9 +91,10 @@ BenchmarkDotNet.Artifacts/
 # Publish output
 publish/
 
-# Claude AI related files
-.claude/
-CLAUDE.md
+# Claude Code（共有するのは CLAUDE.md と .claude/skills/ だけ。個人の設定とメモは入れない）
+.claude/*
+!.claude/skills/
+CLAUDE.local.md
 
 # Editor backup files
 *~
